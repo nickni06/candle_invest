@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>持仓管理 - 设计预览</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root {
+    /* Apple 设计系统色板 */
+    --apple-bg: #fbfbfd;
+    --apple-card: #ffffff;
+    --apple-border: #e5e5ea;
+    --apple-border-soft: #f0f0f2;
+    --apple-text-primary: #1d1d1f;
+    --apple-text-secondary: #6e6e73;
+    --apple-text-tertiary: #86868b;
+    --apple-blue: #0071e3;
+    --apple-blue-hover: #0077ed;
+    --apple-red: #ff3b30;
+    --apple-green: #34c759;
+    --apple-orange: #ff9500;
+    --apple-gray-bg: #f5f5f7;
+    --apple-hover: #f5f5f7;
+    --apple-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--apple-bg);
+    color: var(--apple-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 32px 40px;
+    font-feature-settings: "tnum";
+  }
+
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  /* 设计稿标识条 */
+  .design-banner {
+    background: linear-gradient(90deg, #1d1d1f 0%, #3a3a3c 100%);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    margin-bottom: 24px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .design-banner .tag { background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  .design-banner .desc { color: rgba(255,255,255,0.7); }
+
+  /* 区段标题 */
+  .section-title {
+    font-size: 13px;
+    color: var(--apple-text-tertiary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin: 32px 0 12px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--apple-blue);
+    border-radius: 2px;
+  }
+
+  /* 关注信号卡（占位） */
+  .watchlist-placeholder {
+    background: var(--apple-card);
+    border: 1px solid var(--apple-border);
+    border-radius: 14px;
+    padding: 32px;
+    margin-bottom: 24px;
+    text-align: center;
+    color: var(--apple-text-tertiary);
+  }
+  .watchlist-placeholder i { font-size: 28px; margin-bottom: 8px; display: block; color: var(--apple-blue); }
+
+  /* 持仓管理卡片 */
+  .positions-card {
+    background: var(--apple-card);
+    border: 1px solid var(--apple-border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* 卡片头部 */
+  .pos-header {
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid var(--apple-border-soft);
+  }
+  .pos-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .pos-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pos-title .icon-wrap {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #0071e3 0%, #00a8e8 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px;
+  }
+
+  /* 统计卡组 */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .stat-card {
+    background: var(--apple-gray-bg);
+    border: 1px solid var(--apple-border-soft);
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: default;
+  }
+  .stat-card:hover {
+    background: #fff;
+    border-color: var(--apple-border);
+    transform: translateY(-1px);
+  }
+  .stat-card.accent {
+    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--apple-text-tertiary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--apple-text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat-sub {
+    font-size: 12px;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+    color: var(--apple-text-secondary);
+  }
+  .stat-sub.up { color: var(--apple-red); }
+  .stat-sub.down { color: var(--apple-green); }
+
+  /* 工具栏 */
+  .pos-toolbar {
+    padding: 14px 28px;
+    background: var(--apple-gray-bg);
+    border-bottom: 1px solid var(--apple-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .toolbar-left {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600;
+    color: var(--apple-text-primary);
+  }
+  .toolbar-left .count-badge {
+    background: var(--apple-blue);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .toolbar-right {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  /* 搜索框 */
+  .search-box {
+    position: relative;
+    width: 200px;
+  }
+  .search-box i {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--apple-text-tertiary);
+    font-size: 13px;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 6px 12px 6px 30px;
+    border: 1px solid var(--apple-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    color: var(--apple-text-primary);
+    transition: all 0.15s ease;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.1);
+  }
+
+  /* 排序下拉 */
+  .sort-dropdown {
+    position: relative;
+  }
+  .sort-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--apple-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    color: var(--apple-text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .sort-btn:hover { background: var(--apple-hover); }
+
+  /* 按钮组 */
+  .btn-primary-app {
+    background: var(--apple-blue);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .btn-primary-app:hover { background: var(--apple-blue-hover); transform: translateY(-1px); }
+
+  .btn-secondary-app {
+    background: #fff;
+    color: var(--apple-text-primary);
+    border: 1px solid var(--apple-border);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .btn-secondary-app:hover { background: var(--apple-hover); }
+  .btn-secondary-app.loading { color: var(--apple-text-tertiary); pointer-events: none; }
+  .btn-secondary-app.loading i { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 行情时间 */
+  .quote-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .quote-time {
+    font-size: 11px;
+    color: var(--apple-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .quote-time.fresh { color: var(--apple-green); }
+  .quote-time.stale { color: var(--apple-orange); }
+
+  /* 表格 */
+  .pos-table-wrap {
+    overflow-x: auto;
+  }
+  .pos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .pos-table thead th {
+    background: var(--apple-gray-bg);
+    color: var(--apple-text-secondary);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--apple-border-soft);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .pos-table thead th:hover { background: #ebebed; }
+  .pos-table thead th.text-right { text-align: right; }
+  .pos-table thead th.text-center { text-align: center; }
+  .pos-table thead th .sort-icon {
+    margin-left: 4px;
+    color: var(--apple-text-tertiary);
+    font-size: 10px;
+  }
+  .pos-table thead th.sorted .sort-icon { color: var(--apple-blue); }
+
+  .pos-table tbody tr {
+    border-bottom: 1px solid var(--apple-border-soft);
+    transition: background 0.12s ease;
+    cursor: pointer;
+  }
+  .pos-table tbody tr:hover { background: var(--apple-hover); }
+  .pos-table tbody tr.expanded { background: var(--apple-hover); }
+  .pos-table tbody tr.detail-row { background: #fafafa; }
+  .pos-table tbody tr.detail-row:hover { background: var(--apple-hover); }
+
+  .pos-table tbody td {
+    padding: 14px 16px;
+    color: var(--apple-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .pos-table tbody td.text-right { text-align: right; }
+  .pos-table tbody td.text-center { text-align: center; }
+
+  /* 标的单元格 */
+  .stock-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stock-code {
+    font-weight: 600;
+    color: var(--apple-text-primary);
+    font-size: 13px;
+    letter-spacing: 0.2px;
+  }
+  .stock-name {
+    font-size: 11px;
+    color: var(--apple-text-tertiary);
+  }
+
+  /* 涨跌颜色 */
+  .num-up { color: var(--apple-red); font-weight: 600; }
+  .num-down { color: var(--apple-green); font-weight: 600; }
+  .num-flat { color: var(--apple-text-tertiary); }
+  .num-pending { color: var(--apple-text-tertiary); font-style: italic; }
+
+  /* 操作菜单 */
+  .action-trigger {
+    background: transparent;
+    border: none;
+    color: var(--apple-text-secondary);
+    font-size: 18px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .action-trigger:hover { background: rgba(0,0,0,0.06); color: var(--apple-text-primary); }
+
+  .action-menu {
+    position: absolute;
+    background: #fff;
+    border: 1px solid var(--apple-border);
+    border-radius: 10px;
+    box-shadow: var(--apple-shadow);
+    padding: 4px;
+    z-index: 100;
+    min-width: 120px;
+    display: none;
+  }
+  .action-menu.show { display: block; }
+  .action-menu button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--apple-text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.12s ease;
+  }
+  .action-menu button:hover { background: var(--apple-hover); }
+  .action-menu button.danger { color: var(--apple-red); }
+  .action-menu hr {
+    margin: 4px 0;
+    border: none;
+    border-top: 1px solid var(--apple-border-soft);
+  }
+
+  /* 详情展开行 */
+  .detail-content {
+    padding: 14px 28px 18px 56px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px 24px;
+    font-size: 12px;
+  }
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .detail-label {
+    color: var(--apple-text-tertiary);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+  }
+  .detail-value {
+    color: var(--apple-text-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .detail-value.up { color: var(--apple-red); }
+  .detail-value.down { color: var(--apple-green); }
+  .detail-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--apple-border-soft);
+  }
+  .detail-actions .btn-sm-app {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1px solid var(--apple-border);
+    background: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: all 0.15s ease;
+  }
+  .detail-actions .btn-sm-app:hover { background: var(--apple-hover); }
+  .detail-actions .btn-sm-app.edit { color: var(--apple-blue); border-color: var(--apple-blue); }
+  .detail-actions .btn-sm-app.edit:hover { background: var(--apple-blue); color: #fff; }
+  .detail-actions .btn-sm-app.danger { color: var(--apple-red); border-color: var(--apple-red); }
+  .detail-actions .btn-sm-app.danger:hover { background: var(--apple-red); color: #fff; }
+
+  /* 空状态 */
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--apple-text-tertiary);
+  }
+  .empty-state .empty-icon {
+    width: 64px; height: 64px;
+    background: var(--apple-gray-bg);
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 14px;
+    color: var(--apple-text-tertiary);
+  }
+  .empty-state h4 {
+    color: var(--apple-text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .empty-state p {
+    font-size: 13px;
+    margin: 0 0 16px;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal-app {
+    background: #fff;
+    border-radius: 16px;
+    width: 480px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(20px) scale(0.98); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  .modal-header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid var(--apple-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+  }
+  .modal-title .sub {
+    font-size: 12px;
+    color: var(--apple-text-tertiary);
+    font-weight: 500;
+    margin-left: 6px;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    color: var(--apple-text-tertiary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+  }
+  .modal-close:hover { background: var(--apple-hover); color: var(--apple-text-primary); }
+
+  .modal-body {
+    padding: 20px 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .modal-footer {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--apple-border-soft);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* 表单 */
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    font-size: 12px;
+    color: var(--apple-text-secondary);
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--apple-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 14px;
+    color: var(--apple-text-primary);
+    transition: all 0.15s ease;
+    font-variant-numeric: tabular-nums;
+  }
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.1);
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* 股票搜索下拉 */
+  .code-search-wrap { position: relative; }
+  .code-dropdown {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: #fff;
+    border: 1px solid var(--apple-border);
+    border-radius: 10px;
+    box-shadow: var(--apple-shadow);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 10;
+    margin-top: 4px;
+    display: none;
+  }
+  .code-dropdown.show { display: block; }
+  .code-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.12s ease;
+    border-radius: 6px;
+    margin: 2px;
+  }
+  .code-item:hover { background: var(--apple-hover); }
+  .code-item .code { font-weight: 600; font-size: 13px; }
+  .code-item .name { font-size: 12px; color: var(--apple-text-tertiary); }
+  .code-item .board-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--apple-gray-bg);
+    color: var(--apple-text-secondary);
+    font-weight: 600;
+  }
+
+  /* Toast */
+  .toast-app {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(29,29,31,0.95);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast-app.show { transform: translateX(-50%) translateY(0); }
+  .toast-app.success i { color: var(--apple-green); }
+  .toast-app.error i { color: var(--apple-red); }
+
+  /* 设计标注 */
+  .design-annotation {
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
+    border: 1px dashed #ffc107;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 24px 0;
+    font-size: 12px;
+    color: #856404;
+  }
+  .design-annotation strong { color: #5a4500; }
+  .design-annotation ul { margin: 6px 0 0; padding-left: 18px; }
+  .design-annotation li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 设计稿标识 -->
+  <div class="design-banner">
+    <div><span class="tag">设计预览</span> <span class="desc">持仓管理模块 · Apple 风格 · v1.0</span></div>
+    <div class="desc">可交互演示 · 点击表格行展开 · 点击「+ 添加持仓」打开弹窗</div>
+  </div>
+
+  <!-- 关注信号占位 -->
+  <div class="section-title">关注信号</div>
+  <div class="watchlist-placeholder">
+    <i class="bi bi-star"></i>
+    <div>关注信号卡（保持现状，设计图省略）</div>
+  </div>
+
+  <!-- 持仓管理 -->
+  <div class="section-title">持仓管理</div>
+
+  <div class="positions-card">
+    <!-- 头部 + 统计卡 -->
+    <div class="pos-header">
+      <div class="pos-header-top">
+        <div class="pos-title">
+          <div class="icon-wrap"><i class="bi bi-bag-check"></i></div>
+          持仓管理
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label"><i class="bi bi-wallet2"></i> 总市值</div>
+          <div class="stat-value">¥1,059,640</div>
+          <div class="stat-sub">持仓 5 只</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><i class="bi bi-cash-stack"></i> 总成本</div>
+          <div class="stat-value">¥943,200</div>
+          <div class="stat-sub">仓位 75.0%</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label"><i class="bi bi-graph-up-arrow"></i> 总盈亏</div>
+          <div class="stat-value num-up">+¥116,440</div>
+          <div class="stat-sub up">+12.34% ↑</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label"><i class="bi bi-lightning"></i> 今日盈亏</div>
+          <div class="stat-value num-up">+¥8,520</div>
+          <div class="stat-sub up">+0.81% ↑</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="pos-toolbar">
+      <div class="toolbar-left">
+        <span>持仓明细</span>
+        <span class="count-badge">5</span>
+      </div>
+      <div class="toolbar-right">
+        <div class="search-box">
+          <i class="bi bi-search"></i>
+          <input type="text" placeholder="搜索代码/名称" id="searchInput">
+        </div>
+        <div class="sort-dropdown">
+          <button class="sort-btn">
+            <i class="bi bi-arrow-down-up"></i>
+            <span>盈亏额</span>
+            <i class="bi bi-chevron-down" style="font-size:10px;margin-left:2px;"></i>
+          </button>
+        </div>
+        <button class="btn-primary-app" onclick="openAddModal()">
+          <i class="bi bi-plus-lg"></i> 添加持仓
+        </button>
+        <button class="btn-secondary-app" id="refreshBtn" onclick="refreshQuotes()">
+          <i class="bi bi-arrow-clockwise"></i> 刷新行情
+        </button>
+        <div class="quote-meta">
+          <div class="quote-time fresh" id="quoteTime">
+            <i class="bi bi-clock"></i>
+            <span id="quoteTimeText">刚刚更新</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="pos-table-wrap">
+      <table class="pos-table">
+        <thead>
+          <tr>
+            <th>标的 <span class="sort-icon">↕</span></th>
+            <th class="text-right">成本价 <span class="sort-icon">↕</span></th>
+            <th class="text-right">持仓 <span class="sort-icon">↕</span></th>
+            <th class="text-right">现价 <span class="sort-icon">↕</span></th>
+            <th class="text-right">当日% <span class="sort-icon">↕</span></th>
+            <th class="text-right">盈亏% <span class="sort-icon">↕</span></th>
+            <th class="text-right">盈亏额 <span class="sort-icon sorted">↓</span></th>
+            <th class="text-center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="posTbody">
+          <!-- 数据由 JS 渲染 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 设计标注 -->
+  <div class="design-annotation">
+    <strong>💡 设计要点说明：</strong>
+    <ul>
+      <li><strong>统计卡</strong>：4 列展示核心指标（总市值/总成本/总盈亏/今日盈亏），盈亏卡使用浅红色背景突出</li>
+      <li><strong>表格精简为 8 列</strong>：原 13 列中的「成本金额/今日盈亏/今日盈亏率/备注」移至行展开详情</li>
+      <li><strong>添加/编辑用 Modal 弹窗</strong>：替代左侧常驻表单，腾出空间给表格</li>
+      <li><strong>刷新行情时间</strong>：按钮右下角小字展示，1 分钟内显示「刚刚更新」（绿色），超过 1 小时变橙色提示陈旧</li>
+      <li><strong>行展开</strong>：点击表格行展开详情，含编辑/删除按钮</li>
+      <li><strong>操作菜单</strong>：右侧 ⋯ 按钮提供快捷编辑/删除</li>
+      <li><strong>红涨绿跌</strong>：遵循 A 股配色规则</li>
+      <li><strong>Apple 风格</strong>：纯白底色、浅灰边框、12px 圆角、无阴影、tabular-nums 数字对齐</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- 添加/编辑 Modal -->
+<div class="modal-overlay" id="posModal">
+  <div class="modal-app">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">添加持仓 <span class="sub" id="modalSub"></span></div>
+      <button class="modal-close" onclick="closeModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>股票代码</label>
+        <div class="code-search-wrap">
+          <input type="text" id="codeSearchInput" placeholder="搜索代码或名称..." autocomplete="off">
+          <div class="code-dropdown" id="codeDropdown">
+            <div class="code-item" onclick="selectCode('600519.SH', '贵州茅台', 'hs')">
+              <div><span class="code">600519.SH</span> <span class="name">贵州茅台</span></div>
+              <span class="board-tag">沪深</span>
+            </div>
+            <div class="code-item" onclick="selectCode('000858.SZ', '五粮液', 'hs')">
+              <div><span class="code">000858.SZ</span> <span class="name">五粮液</span></div>
+              <span class="board-tag">沪深</span>
+            </div>
+            <div class="code-item" onclick="selectCode('300750.SZ', '宁德时代', 'cy')">
+              <div><span class="code">300750.SZ</span> <span class="name">宁德时代</span></div>
+              <span class="board-tag">创业板</span>
+            </div>
+            <div class="code-item" onclick="selectCode('688981.SH', '中芯国际', 'kc')">
+              <div><span class="code">688981.SH</span> <span class="name">中芯国际</span></div>
+              <span class="board-tag">科创板</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>成本价</label>
+          <input type="number" id="costInput" step="0.001" min="0" placeholder="0.000">
+        </div>
+        <div class="form-group">
+          <label>股数</label>
+          <input type="number" id="sharesInput" min="1" step="100" placeholder="100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="notesInput" placeholder="可选，如：长线持有">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-app" onclick="closeModal()">取消</button>
+      <button class="btn-primary-app" onclick="savePosition()"><i class="bi bi-check-lg"></i> 保存持仓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-app" id="toast">
+  <i class="bi bi-check-circle-fill"></i>
+  <span id="toastText">操作成功</span>
+</div>
+
+<script>
+// 模拟数据
+const positions = [
+  {code: '600519.SH', name: '贵州茅台', cost_price: 1680.00, shares: 100, cost_amount: 168000, current: 1820.00, pct_chg: 1.20, today_profit: 2160, today_profit_pct: 1.20, profit: 14000, profit_pct: 8.33, notes: '长线持有 · 价值投资'},
+  {code: '000858.SZ', name: '五粮液', cost_price: 158.00, shares: 1000, cost_amount: 158000, current: 162.50, pct_chg: -0.61, today_profit: -1000, today_profit_pct: -0.61, profit: 4500, profit_pct: 2.85, notes: '白酒板块轮动'},
+  {code: '300750.SZ', name: '宁德时代', cost_price: 380.00, shares: 300, cost_amount: 114000, current: 425.00, pct_chg: 2.15, today_profit: 2682, today_profit_pct: 2.15, profit: 13500, profit_pct: 11.84, notes: '新能源主线'},
+  {code: '688981.SH', name: '中芯国际', cost_price: 95.00, shares: 800, cost_amount: 76000, current: 88.20, pct_chg: -1.45, today_profit: -1035, today_profit_pct: -1.45, profit: -5440, profit_pct: -7.16, notes: '半导体周期'},
+  {code: '510300.SH', name: '沪深300ETF', cost_price: 4.250, shares: 50000, cost_amount: 212500, current: 4.478, pct_chg: 0.61, today_profit: 5670, today_profit_pct: 0.61, profit: 11400, profit_pct: 5.37, notes: '指数底仓'},
+];
+
+let expandedRow = null;
+
+function fmtNum(v, decimals = 2) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  return Number(v).toLocaleString('zh-CN', {maximumFractionDigits: decimals, minimumFractionDigits: decimals});
+}
+
+function fmtPct(v) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  const sign = v > 0 ? '+' : '';
+  return sign + Number(v).toFixed(2) + '%';
+}
+
+function fmtMoney(v) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  const sign = v > 0 ? '+' : '';
+  return sign + '¥' + Math.abs(Number(v)).toLocaleString('zh-CN', {maximumFractionDigits: 0});
+}
+
+function colorClass(v) {
+  if (v === null || v === undefined || isNaN(v) || v === 0) return 'num-flat';
+  return v > 0 ? 'num-up' : 'num-down';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('posTbody');
+  tbody.innerHTML = positions.map((p, i) => `
+    <tr onclick="toggleRow(${i})" id="row-${i}">
+      <td>
+        <div class="stock-cell">
+          <span class="stock-code">${p.code}</span>
+          <span class="stock-name">${p.name}</span>
+        </div>
+      </td>
+      <td class="text-right">${fmtNum(p.cost_price, 3)}</td>
+      <td class="text-right">${fmtNum(p.shares, 0)}</td>
+      <td class="text-right">${fmtNum(p.current, 3)}</td>
+      <td class="text-right ${colorClass(p.pct_chg)}">${fmtPct(p.pct_chg)}</td>
+      <td class="text-right ${colorClass(p.profit_pct)}">${fmtPct(p.profit_pct)}</td>
+      <td class="text-right ${colorClass(p.profit)}" style="font-weight:700">${fmtMoney(p.profit)}</td>
+      <td class="text-center" onclick="event.stopPropagation()">
+        <button class="action-trigger" onclick="toggleActionMenu(event, ${i})"><i class="bi bi-three-dots"></i></button>
+      </td>
+    </tr>
+    <tr class="detail-row" id="detail-${i}" style="display:none">
+      <td colspan="8">
+        <div class="detail-content">
+          <div class="detail-item">
+            <span class="detail-label">成本金额</span>
+            <span class="detail-value">¥${fmtNum(p.cost_amount, 0)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">今日盈亏</span>
+            <span class="detail-value ${p.today_profit >= 0 ? 'up' : 'down'}">${fmtMoney(p.today_profit)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">今日盈亏率</span>
+            <span class="detail-value ${p.today_profit_pct >= 0 ? 'up' : 'down'}">${fmtPct(p.today_profit_pct)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">备注</span>
+            <span class="detail-value" style="font-weight:500">${p.notes || '无'}</span>
+          </div>
+          <div class="detail-actions">
+            <button class="btn-sm-app edit" onclick="editPosition(${i})"><i class="bi bi-pencil"></i> 编辑</button>
+            <button class="btn-sm-app danger" onclick="deletePosition(${i})"><i class="bi bi-trash3"></i> 删除</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function toggleRow(i) {
+  const detail = document.getElementById(`detail-${i}`);
+  const row = document.getElementById(`row-${i}`);
+  if (expandedRow === i) {
+    detail.style.display = 'none';
+    row.classList.remove('expanded');
+    expandedRow = null;
+  } else {
+    if (expandedRow !== null) {
+      document.getElementById(`detail-${expandedRow}`).style.display = 'none';
+      document.getElementById(`row-${expandedRow}`).classList.remove('expanded');
+    }
+    detail.style.display = '';
+    row.classList.add('expanded');
+    expandedRow = i;
+  }
+}
+
+function toggleActionMenu(e, i) {
+  e.stopPropagation();
+  showToast('操作菜单：编辑 / 删除', 'success');
+}
+
+function openAddModal() {
+  document.getElementById('modalTitle').innerHTML = '添加持仓 <span class="sub"></span>';
+  document.getElementById('codeSearchInput').value = '';
+  document.getElementById('costInput').value = '';
+  document.getElementById('sharesInput').value = '';
+  document.getElementById('notesInput').value = '';
+  document.getElementById('posModal').classList.add('show');
+  setTimeout(() => document.getElementById('codeSearchInput').focus(), 100);
+}
+
+function editPosition(i) {
+  const p = positions[i];
+  document.getElementById('modalTitle').innerHTML = '编辑持仓 <span class="sub">' + p.code + ' ' + p.name + '</span>';
+  document.getElementById('codeSearchInput').value = p.code + ' ' + p.name;
+  document.getElementById('costInput').value = p.cost_price;
+  document.getElementById('sharesInput').value = p.shares;
+  document.getElementById('notesInput').value = p.notes || '';
+  document.getElementById('posModal').classList.add('show');
+}
+
+function deletePosition(i) {
+  if (confirm('确认删除 ' + positions[i].code + ' ' + positions[i].name + ' 的持仓？')) {
+    positions.splice(i, 1);
+    renderTable();
+    showToast('持仓已删除', 'success');
+  }
+}
+
+function closeModal() {
+  document.getElementById('posModal').classList.remove('show');
+}
+
+function selectCode(code, name, board) {
+  document.getElementById('codeSearchInput').value = code + ' ' + name;
+  document.getElementById('codeDropdown').classList.remove('show');
+}
+
+function savePosition() {
+  closeModal();
+  showToast('持仓已保存', 'success');
+}
+
+function refreshQuotes() {
+  const btn = document.getElementById('refreshBtn');
+  const timeEl = document.getElementById('quoteTime');
+  const textEl = document.getElementById('quoteTimeText');
+  btn.classList.add('loading');
+  btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 加载中';
+  timeEl.className = 'quote-time';
+  textEl.textContent = '加载中...';
+
+  setTimeout(() => {
+    btn.classList.remove('loading');
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新行情';
+    timeEl.className = 'quote-time fresh';
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    textEl.textContent = '更新于 ' + hh + ':' + mm + ':' + ss;
+    // 模拟价格波动
+    positions.forEach(p => {
+      const delta = (Math.random() - 0.5) * 0.02;
+      p.current = p.current * (1 + delta);
+      p.pct_chg = delta * 100;
+    });
+    renderTable();
+    showToast('行情已刷新', 'success');
+  }, 1200);
+}
+
+function showToast(text, type = 'success') {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  toast.className = 'toast-app ' + type + ' show';
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// 搜索下拉
+document.getElementById('codeSearchInput').addEventListener('focus', function() {
+  document.getElementById('codeDropdown').classList.add('show');
+});
+document.getElementById('codeSearchInput').addEventListener('blur', function() {
+  setTimeout(() => document.getElementById('codeDropdown').classList.remove('show'), 200);
+});
+
+// 搜索过滤
+document.getElementById('codeSearchInput').addEventListener('input', function() {
+  // 简化演示，实际项目会动态过滤
+});
+
+// 初始渲染
+renderTable();
+</script>
+</body>
+</html>

@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>持仓管理 v2 - 设计预览</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root {
+    /* 主色调：白 + 蓝 */
+    --apple-bg: #f5f7fa;
+    --apple-card: #ffffff;
+    --apple-border: #e5e5ea;
+    --apple-border-soft: #ececf0;
+    --apple-text-primary: #1d1d1f;
+    --apple-text-secondary: #6e6e73;
+    --apple-text-tertiary: #86868b;
+    --apple-blue: #0066ff;
+    --apple-blue-hover: #0052cc;
+    --apple-blue-soft: #e6f0ff;
+    --apple-blue-bg: #f0f6ff;
+    /* 辅助色：紫 */
+    --apple-purple: #7c3aed;
+    --apple-purple-hover: #6d28d9;
+    --apple-purple-soft: #f3ebff;
+    --apple-purple-bg: #faf5ff;
+    /* 状态色 */
+    --apple-red: #ff3b30;
+    --apple-green: #34c759;
+    --apple-orange: #ff9500;
+    --apple-gray-bg: #f5f5f7;
+    --apple-hover: #f0f6ff;
+    --apple-shadow-sm: 0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.03);
+    --apple-shadow-md: 0 4px 12px rgba(0,102,255,0.08), 0 1px 3px rgba(0,0,0,0.04);
+    --apple-shadow-lg: 0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--apple-bg);
+    background-image:
+      radial-gradient(circle at 0% 0%, rgba(0,102,255,0.04) 0, transparent 50%),
+      radial-gradient(circle at 100% 0%, rgba(124,58,237,0.04) 0, transparent 50%);
+    color: var(--apple-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 32px 40px 60px;
+    font-feature-settings: "tnum";
+    min-height: 100vh;
+    font-size: 15px; /* 整体字号放大两号（13→15） */
+  }
+
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  /* 设计稿标识 */
+  .design-banner {
+    background: linear-gradient(135deg, #1d1d1f 0%, #2c2c2e 100%);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 14px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--apple-shadow-md);
+  }
+  .design-banner .tag {
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-right: 12px;
+  }
+  .design-banner .desc { color: rgba(255,255,255,0.7); }
+  .design-banner .actions { display: flex; gap: 10px; font-size: 13px; }
+  .design-banner .action-chip {
+    background: rgba(255,255,255,0.1);
+    padding: 3px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* 区段标题 */
+  .section-title {
+    font-size: 14px;
+    color: var(--apple-text-tertiary);
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    margin: 28px 0 14px 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: linear-gradient(180deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+    border-radius: 2px;
+  }
+
+  /* 关注信号占位 */
+  .watchlist-placeholder {
+    background: var(--apple-card);
+    border: 1px solid var(--apple-border);
+    border-radius: 16px;
+    padding: 40px;
+    margin-bottom: 24px;
+    text-align: center;
+    color: var(--apple-text-tertiary);
+    box-shadow: var(--apple-shadow-sm);
+  }
+  .watchlist-placeholder i { font-size: 32px; margin-bottom: 10px; display: block; color: var(--apple-blue); }
+
+  /* 持仓管理卡片 */
+  .positions-card {
+    background: var(--apple-card);
+    border: 1px solid var(--apple-border);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: var(--apple-shadow-sm);
+  }
+
+  /* === 头部 + 统计卡 === */
+  .pos-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--apple-border-soft);
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%);
+  }
+  .pos-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .pos-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .pos-title .icon-wrap {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 19px;
+    box-shadow: 0 4px 10px rgba(0,102,255,0.25);
+  }
+  .pos-title .title-text { display: flex; flex-direction: column; gap: 1px; }
+  .pos-title .title-text .main { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .pos-title .title-text .sub { font-size: 13px; color: var(--apple-text-tertiary); font-weight: 500; }
+
+  /* 统计卡 */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .stat-card {
+    background: var(--apple-card);
+    border: 1px solid var(--apple-border-soft);
+    border-radius: 14px;
+    padding: 16px 18px;
+    transition: all 0.25s var(--ease-out);
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--apple-blue);
+    opacity: 0;
+    transition: opacity 0.25s var(--ease-out);
+  }
+  .stat-card:hover {
+    border-color: var(--apple-blue);
+    box-shadow: var(--apple-shadow-md);
+    transform: translateY(-1px);
+  }
+  .stat-card:hover::before { opacity: 1; }
+  .stat-card.accent-blue { background: linear-gradient(135deg, var(--apple-blue-bg) 0%, #fff 60%); }
+  .stat-card.accent-purple { background: linear-gradient(135deg, var(--apple-purple-bg) 0%, #fff 60%); }
+  .stat-card.accent-blue::before { background: var(--apple-blue); opacity: 1; }
+  .stat-card.accent-purple::before { background: var(--apple-purple); opacity: 1; }
+  /* 今日盈亏：红盈绿亏（动态切换背景色） */
+  .stat-card.accent-red {
+    background: linear-gradient(135deg, #fff0f0 0%, #fff 60%);
+  }
+  .stat-card.accent-red::before { background: var(--apple-red); opacity: 1; }
+  .stat-card.accent-green {
+    background: linear-gradient(135deg, #f0fff5 0%, #fff 60%);
+  }
+  .stat-card.accent-green::before { background: var(--apple-green); opacity: 1; }
+  /* 平盘时中性背景 */
+  .stat-card.accent-flat {
+    background: linear-gradient(135deg, var(--apple-gray-bg) 0%, #fff 60%);
+  }
+  .stat-card.accent-flat::before { background: var(--apple-text-tertiary); opacity: 1; }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--apple-text-tertiary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--apple-text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat-sub {
+    font-size: 14px;
+    margin-top: 5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--apple-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .stat-sub.up { color: var(--apple-red); }
+  .stat-sub.down { color: var(--apple-green); }
+
+  /* === 工具栏 === */
+  .pos-toolbar {
+    padding: 14px 28px;
+    background: linear-gradient(180deg, var(--apple-gray-bg) 0%, #fafbfc 100%);
+    border-bottom: 1px solid var(--apple-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .toolbar-left {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 16px; font-weight: 600;
+    color: var(--apple-text-primary);
+  }
+  .toolbar-left .count-badge {
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+    color: #fff;
+    font-size: 13px;
+    padding: 2px 10px;
+    border-radius: 11px;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,102,255,0.2);
+  }
+  .toolbar-right {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* 搜索框 */
+  .search-box {
+    position: relative;
+    width: 220px;
+  }
+  .search-box i {
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--apple-text-tertiary);
+    font-size: 15px;
+    pointer-events: none;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 8px 14px 8px 34px;
+    border: 1px solid var(--apple-border);
+    border-radius: 9px;
+    background: #fff;
+    font-size: 15px;
+    color: var(--apple-text-primary);
+    transition: all 0.15s ease;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,102,255,0.12);
+  }
+
+  /* 排序下拉 */
+  .sort-btn {
+    padding: 8px 14px;
+    border: 1px solid var(--apple-border);
+    border-radius: 9px;
+    background: #fff;
+    font-size: 15px;
+    color: var(--apple-text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .sort-btn:hover { background: var(--apple-hover); border-color: var(--apple-blue); }
+
+  /* 按钮组 */
+  .btn-primary-app {
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-blue-hover) 100%);
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s var(--ease-out);
+    box-shadow: 0 2px 6px rgba(0,102,255,0.25);
+  }
+  .btn-primary-app:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,102,255,0.35);
+  }
+  .btn-primary-app:active { transform: translateY(0); }
+
+  .btn-purple-app {
+    background: linear-gradient(135deg, var(--apple-purple) 0%, var(--apple-purple-hover) 100%);
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s var(--ease-out);
+    box-shadow: 0 2px 6px rgba(124,58,237,0.25);
+  }
+  .btn-purple-app:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124,58,237,0.35);
+  }
+
+  .btn-secondary-app {
+    background: #fff;
+    color: var(--apple-text-primary);
+    border: 1px solid var(--apple-border);
+    padding: 8px 16px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .btn-secondary-app:hover { background: var(--apple-hover); border-color: var(--apple-blue); }
+  .btn-secondary-app.loading { color: var(--apple-text-tertiary); pointer-events: none; }
+  .btn-secondary-app.loading i { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 行情时间：统一灰色 */
+  .quote-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .quote-time {
+    font-size: 13px;
+    color: var(--apple-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .quote-time.fresh { color: var(--apple-text-tertiary); }
+  .quote-time.stale { color: var(--apple-text-tertiary); }
+  .quote-time.loading { color: var(--apple-text-tertiary); }
+
+  /* === 表格 === */
+  .pos-table-wrap {
+    overflow-x: auto;
+    max-height: 540px;
+    overflow-y: auto;
+  }
+  .pos-table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .pos-table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .pos-table-wrap::-webkit-scrollbar-thumb { background: var(--apple-border); border-radius: 3px; }
+  .pos-table-wrap::-webkit-scrollbar-thumb:hover { background: var(--apple-text-tertiary); }
+
+  .pos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+  }
+  .pos-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .pos-table thead th {
+    background: var(--apple-gray-bg);
+    color: var(--apple-text-secondary);
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--apple-border-soft);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .pos-table thead th:hover { background: #ebeeed; color: var(--apple-text-primary); }
+  .pos-table thead th.text-right { text-align: right; }
+  .pos-table thead th.text-center { text-align: center; }
+  .pos-table thead th .sort-icon {
+    margin-left: 4px;
+    color: var(--apple-text-tertiary);
+    font-size: 12px;
+  }
+  .pos-table thead th.sorted .sort-icon { color: var(--apple-blue); }
+  .pos-table thead th.sorted { color: var(--apple-blue); }
+
+  .pos-table tbody tr {
+    border-bottom: 1px solid var(--apple-border-soft);
+    transition: background 0.12s ease;
+  }
+  .pos-table tbody tr:hover { background: var(--apple-hover); }
+  .pos-table tbody tr.expanded { background: var(--apple-blue-soft); }
+  .pos-table tbody tr.detail-row { background: #fafbfc; }
+  .pos-table tbody tr.detail-row:hover { background: var(--apple-hover); }
+
+  /* 末行添加新持仓：弱化样式 */
+  .pos-table tbody tr.add-row {
+    background: linear-gradient(90deg, var(--apple-purple-bg) 0%, #fff 100%);
+    border-top: 1px dashed var(--apple-border);
+    cursor: pointer;
+  }
+  .pos-table tbody tr.add-row:hover {
+    background: var(--apple-hover);
+  }
+  .pos-table tbody tr.add-row td {
+    padding: 16px 18px;
+    text-align: center;
+    color: var(--apple-text-secondary);
+    font-weight: 500;
+    font-size: 15px;
+  }
+  .pos-table tbody tr.add-row:hover td {
+    color: var(--apple-purple);
+  }
+  .pos-table tbody tr.add-row .add-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    background: transparent;
+    color: var(--apple-purple);
+    border: 1px solid var(--apple-purple);
+    border-radius: 50%;
+    font-size: 14px;
+    margin-right: 8px;
+    transition: all 0.15s ease;
+  }
+  .pos-table tbody tr.add-row:hover .add-icon {
+    background: var(--apple-purple);
+    color: #fff;
+  }
+
+  .pos-table tbody td {
+    padding: 16px 18px;
+    color: var(--apple-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .pos-table tbody td.text-right { text-align: right; }
+  .pos-table tbody td.text-center { text-align: center; }
+
+  /* 标的单元格 */
+  .stock-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stock-code {
+    font-weight: 600;
+    color: var(--apple-text-primary);
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stock-code .board-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .board-tag.hs { background: var(--apple-blue-soft); color: var(--apple-blue); }
+  .board-tag.cy { background: var(--apple-purple-soft); color: var(--apple-purple); }
+  .board-tag.kc { background: #ffe5e5; color: var(--apple-red); }
+  .board-tag.etf { background: #e0f5e9; color: var(--apple-green); }
+  .stock-name {
+    font-size: 13px;
+    color: var(--apple-text-tertiary);
+  }
+
+  /* 涨跌颜色 */
+  .num-up { color: var(--apple-red); font-weight: 600; }
+  .num-down { color: var(--apple-green); font-weight: 600; }
+  .num-flat { color: var(--apple-text-tertiary); }
+  .num-pending { color: var(--apple-text-tertiary); font-style: italic; }
+
+  /* 行内编辑单元格 */
+  .editable-cell {
+    cursor: text;
+    position: relative;
+    padding: 4px 8px !important;
+    border-radius: 6px;
+    margin: -4px -8px;
+    transition: background 0.15s ease;
+    display: inline-block;
+    min-width: 80px;
+  }
+  .editable-cell:hover {
+    background: var(--apple-blue-soft);
+    outline: 1px solid var(--apple-blue);
+  }
+  .editable-cell::after {
+    content: '\F4CB';
+    font-family: 'bootstrap-icons';
+    font-size: 12px;
+    color: var(--apple-blue);
+    margin-left: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .editable-cell:hover::after { opacity: 0.7; }
+  .editable-cell.editing {
+    background: #fff;
+    outline: 2px solid var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,102,255,0.12);
+  }
+  .editable-cell.editing::after { display: none; }
+  .editable-cell input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    font-size: 15px;
+    color: var(--apple-text-primary);
+    font-variant-numeric: tabular-nums;
+    padding: 0;
+    outline: none;
+    font-family: inherit;
+  }
+
+  /* 操作菜单 */
+  .action-trigger {
+    background: transparent;
+    border: none;
+    color: var(--apple-text-secondary);
+    font-size: 18px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .action-trigger:hover { background: rgba(0,102,255,0.1); color: var(--apple-blue); }
+
+  .action-menu {
+    position: absolute;
+    background: #fff;
+    border: 1px solid var(--apple-border);
+    border-radius: 12px;
+    box-shadow: var(--apple-shadow-lg);
+    padding: 5px;
+    z-index: 100;
+    min-width: 140px;
+    display: none;
+    animation: menuFadeIn 0.15s var(--ease-out);
+  }
+  @keyframes menuFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .action-menu.show { display: block; }
+  .action-menu button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--apple-text-primary);
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.12s ease;
+  }
+  .action-menu button:hover { background: var(--apple-hover); }
+  .action-menu button.danger { color: var(--apple-red); }
+  .action-menu button.danger:hover { background: #fff0f0; }
+  .action-menu hr {
+    margin: 4px 0;
+    border: none;
+    border-top: 1px solid var(--apple-border-soft);
+  }
+
+  /* 详情展开行 */
+  .detail-content {
+    padding: 18px 28px 20px 56px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px 28px;
+    font-size: 14px;
+  }
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .detail-label {
+    color: var(--apple-text-tertiary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .detail-value {
+    color: var(--apple-text-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+  }
+  /* 明细里当日盈亏、盈亏率按红盈绿亏 */
+  .detail-value.up { color: var(--apple-red); }
+  .detail-value.down { color: var(--apple-green); }
+  .detail-value.notes {
+    font-weight: 500;
+    color: var(--apple-text-secondary);
+    font-style: italic;
+  }
+  .detail-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--apple-border-soft);
+  }
+  .detail-actions .btn-sm-app {
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    border: 1px solid var(--apple-border);
+    background: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: all 0.15s ease;
+    font-weight: 500;
+  }
+  .detail-actions .btn-sm-app:hover { background: var(--apple-hover); }
+  .detail-actions .btn-sm-app.edit {
+    color: var(--apple-blue);
+    border-color: var(--apple-blue);
+    background: var(--apple-blue-bg);
+  }
+  .detail-actions .btn-sm-app.edit:hover { background: var(--apple-blue); color: #fff; }
+  .detail-actions .btn-sm-app.danger {
+    color: var(--apple-red);
+    border-color: var(--apple-red);
+    background: #fff0f0;
+  }
+  .detail-actions .btn-sm-app.danger:hover { background: var(--apple-red); color: #fff; }
+
+  /* === 末行添加内嵌表单 === */
+  .add-form-row td {
+    padding: 14px 16px !important;
+    background: var(--apple-purple-bg);
+  }
+  .add-form-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 2fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .add-form-content input {
+    padding: 7px 12px;
+    border: 1px solid var(--apple-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 15px;
+    color: var(--apple-text-primary);
+    transition: all 0.15s ease;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+  }
+  .add-form-content input:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,102,255,0.12);
+  }
+  .add-form-content input::placeholder { color: var(--apple-text-tertiary); }
+  .add-form-actions { display: flex; gap: 6px; }
+  .add-form-actions button {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+    transition: all 0.15s ease;
+    font-weight: 600;
+  }
+  /* 弱化的添加按钮 */
+  .add-form-actions .btn-confirm {
+    background: var(--apple-blue);
+    color: #fff;
+  }
+  .add-form-actions .btn-confirm:hover { background: var(--apple-blue-hover); }
+  .add-form-actions .btn-cancel {
+    background: #fff;
+    color: var(--apple-text-secondary);
+    border: 1px solid var(--apple-border);
+  }
+  .add-form-actions .btn-cancel:hover { background: var(--apple-hover); }
+
+  /* 股票代码搜索下拉（嵌入表单内） */
+  .code-search-inline {
+    position: relative;
+  }
+  .code-dropdown-inline {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: #fff;
+    border: 1px solid var(--apple-border);
+    border-radius: 10px;
+    box-shadow: var(--apple-shadow-lg);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 20;
+    margin-top: 4px;
+    display: none;
+  }
+  .code-dropdown-inline.show { display: block; }
+  .code-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.12s ease;
+    border-radius: 7px;
+    margin: 2px;
+  }
+  .code-item:hover { background: var(--apple-hover); }
+  .code-item .code { font-weight: 600; font-size: 15px; }
+  .code-item .name { font-size: 13px; color: var(--apple-text-tertiary); margin-left: 6px; }
+
+  /* === Modal（用于完整编辑，备选） === */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal-app {
+    background: #fff;
+    border-radius: 18px;
+    width: 500px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: var(--apple-shadow-lg);
+    animation: slideUp 0.3s var(--ease-out);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(24px) scale(0.96); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .modal-header {
+    padding: 22px 26px 16px;
+    border-bottom: 1px solid var(--apple-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal-title .icon-wrap {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    color: var(--apple-text-tertiary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+    font-size: 16px;
+  }
+  .modal-close:hover { background: var(--apple-hover); color: var(--apple-text-primary); }
+
+  .modal-body { padding: 22px 26px; }
+  .modal-footer {
+    padding: 16px 26px 22px;
+    border-top: 1px solid var(--apple-border-soft);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-group label {
+    font-size: 14px;
+    color: var(--apple-text-secondary);
+    font-weight: 600;
+    margin-bottom: 7px;
+    display: block;
+    letter-spacing: 0.2px;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--apple-border);
+    border-radius: 9px;
+    background: #fff;
+    font-size: 16px;
+    color: var(--apple-text-primary);
+    transition: all 0.15s ease;
+    font-variant-numeric: tabular-nums;
+  }
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0,102,255,0.12);
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Toast */
+  .toast-app {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(29,29,31,0.96);
+    color: #fff;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 15px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--apple-shadow-lg);
+    transition: transform 0.3s var(--ease-out);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+  }
+  .toast-app.show { transform: translateX(-50%) translateY(0); }
+  .toast-app.success i { color: var(--apple-green); }
+  .toast-app.error i { color: var(--apple-red); }
+  .toast-app.info i { color: var(--apple-blue); }
+
+  /* 设计标注 */
+  .design-annotation {
+    background: linear-gradient(135deg, var(--apple-blue-bg) 0%, var(--apple-purple-bg) 100%);
+    border: 1px solid var(--apple-border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 28px 0;
+    font-size: 14px;
+    color: var(--apple-text-primary);
+  }
+  .design-annotation strong { color: var(--apple-blue); font-size: 15px; }
+  .design-annotation ul { margin: 10px 0 0; padding-left: 22px; }
+  .design-annotation li { margin: 5px 0; line-height: 1.6; }
+  .design-annotation .hl-blue { color: var(--apple-blue); font-weight: 600; }
+  .design-annotation .hl-purple { color: var(--apple-purple); font-weight: 600; }
+
+  /* 入场动画 */
+  .positions-card, .stat-card {
+    animation: cardFadeIn 0.5s var(--ease-out) both;
+  }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.10s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.20s; }
+  @keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 设计稿标识 -->
+  <div class="design-banner">
+    <div>
+      <span class="tag">v2 设计预览</span>
+      <span class="desc">持仓管理 · 白蓝主色 + 紫色辅助 · 行内编辑 + 末行添加</span>
+    </div>
+    <div class="actions">
+      <span class="action-chip">点击成本价/股数可直接修改</span>
+      <span class="action-chip">末行点击可内嵌添加</span>
+    </div>
+  </div>
+
+  <!-- 关注信号占位 -->
+  <div class="section-title">关注信号</div>
+  <div class="watchlist-placeholder">
+    <i class="bi bi-star"></i>
+    <div>关注信号卡（保持现状，设计图省略）</div>
+  </div>
+
+  <!-- 持仓管理 -->
+  <div class="section-title">持仓管理</div>
+
+  <div class="positions-card">
+    <!-- 头部 + 统计卡 -->
+    <div class="pos-header">
+      <div class="pos-header-top">
+        <div class="pos-title">
+          <div class="icon-wrap"><i class="bi bi-bag-check"></i></div>
+          <div class="title-text">
+            <span class="main">持仓管理</span>
+            <span class="sub">实时行情 · 智能盈亏分析</span>
+          </div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card accent-blue">
+          <div class="stat-label"><i class="bi bi-wallet2"></i> 总市值</div>
+          <div class="stat-value">¥1,059,640</div>
+          <div class="stat-sub">持仓 5 只</div>
+        </div>
+        <div class="stat-card accent-purple">
+          <div class="stat-label"><i class="bi bi-cash-stack"></i> 总成本</div>
+          <div class="stat-value">¥943,200</div>
+          <div class="stat-sub">仓位 75.0%</div>
+        </div>
+        <div class="stat-card accent-red" id="totalProfitCard">
+          <div class="stat-label"><i class="bi bi-graph-up-arrow"></i> 总盈亏</div>
+          <div class="stat-value num-up" id="totalProfitValue">+¥116,440</div>
+          <div class="stat-sub up" id="totalProfitSub"><i class="bi bi-arrow-up"></i> +12.34%</div>
+        </div>
+        <div class="stat-card accent-red" id="todayProfitCard">
+          <div class="stat-label"><i class="bi bi-lightning"></i> 今日盈亏</div>
+          <div class="stat-value num-up" id="todayProfitValue">+¥8,520</div>
+          <div class="stat-sub up" id="todayProfitSub"><i class="bi bi-arrow-up"></i> +0.81%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="pos-toolbar">
+      <div class="toolbar-left">
+        <span>持仓明细</span>
+        <span class="count-badge">5</span>
+      </div>
+      <div class="toolbar-right">
+        <div class="search-box">
+          <i class="bi bi-search"></i>
+          <input type="text" placeholder="搜索代码/名称" id="searchInput">
+        </div>
+        <button class="sort-btn">
+          <i class="bi bi-arrow-down-up"></i>
+          <span>盈亏额</span>
+          <i class="bi bi-chevron-down" style="font-size:10px;margin-left:2px;"></i>
+        </button>
+        <button class="btn-secondary-app" id="refreshBtn" onclick="refreshQuotes()">
+          <i class="bi bi-arrow-clockwise"></i> 刷新行情
+        </button>
+        <div class="quote-meta">
+          <div class="quote-time fresh" id="quoteTime">
+            <i class="bi bi-clock"></i>
+            <span id="quoteTimeText">刚刚更新</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="pos-table-wrap">
+      <table class="pos-table">
+        <thead>
+          <tr>
+            <th>标的 <span class="sort-icon">↕</span></th>
+            <th class="text-right">成本价 <i class="bi bi-pencil" style="font-size:11px;margin-left:3px;color:var(--apple-blue);"></i></th>
+            <th class="text-right">持仓股数 <i class="bi bi-pencil" style="font-size:11px;margin-left:3px;color:var(--apple-blue);"></i></th>
+            <th class="text-right">现价 <span class="sort-icon">↕</span></th>
+            <th class="text-right">当日% <span class="sort-icon">↕</span></th>
+            <th class="text-right">盈亏% <span class="sort-icon">↕</span></th>
+            <th class="text-right sorted">盈亏额 <span class="sort-icon">↓</span></th>
+            <th class="text-center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="posTbody">
+          <!-- 数据由 JS 渲染 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 设计标注 -->
+  <div class="design-annotation">
+    <strong><i class="bi bi-lightbulb"></i> v2 设计要点：</strong>
+    <ul>
+      <li><span class="hl-blue">主色调</span>：白底 + 蓝色主操作 + <span class="hl-purple">紫色辅助色</span>（用于添加功能、创业板标签、统计卡左侧色条）</li>
+      <li><span class="hl-blue">行内编辑</span>：成本价、持仓股数点击即可编辑，hover 显示蓝色描边 + 编辑图标，回车保存、Esc 取消</li>
+      <li><span class="hl-purple">末行内嵌添加</span>：表格末行紫色虚线分隔的「+ 添加持仓」按钮，点击后在表格内展开输入行（代码搜索 + 成本价 + 股数 + 备注 + 确认/取消）</li>
+      <li>统计卡：4 列渐变背景，左侧 3px 色条标识（蓝/紫/红/绿），hover 上浮 + 蓝色边框</li>
+      <li>板块标签：沪深蓝 / 创业板紫 / 科创板红 / ETF 绿</li>
+      <li>表格头：成本价、持仓旁有铅笔图标提示可编辑</li>
+      <li>所有操作按钮：蓝色主操作 / 紫色添加 / 白色描边次操作，渐变 + 阴影</li>
+      <li>入场动画：统计卡 staggered fade-in，500ms cubic-bezier(0.16, 1, 0.3, 1)</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- 末行添加内嵌表单模板（隐藏，点击末行后克隆显示） -->
+<template id="addFormTemplate">
+  <tr class="add-form-row">
+    <td colspan="8">
+      <div class="add-form-content">
+        <div class="code-search-inline">
+          <input type="text" placeholder="搜索代码或名称..." id="addCodeInput">
+          <div class="code-dropdown-inline" id="addCodeDropdown">
+            <div class="code-item" data-code="600519.SH" data-name="贵州茅台" data-board="hs">
+              <div><span class="code">600519.SH</span><span class="name">贵州茅台</span></div>
+              <span class="board-tag hs">沪深</span>
+            </div>
+            <div class="code-item" data-code="000858.SZ" data-name="五粮液" data-board="hs">
+              <div><span class="code">000858.SZ</span><span class="name">五粮液</span></div>
+              <span class="board-tag hs">沪深</span>
+            </div>
+            <div class="code-item" data-code="300750.SZ" data-name="宁德时代" data-board="cy">
+              <div><span class="code">300750.SZ</span><span class="name">宁德时代</span></div>
+              <span class="board-tag cy">创业板</span>
+            </div>
+            <div class="code-item" data-code="688981.SH" data-name="中芯国际" data-board="kc">
+              <div><span class="code">688981.SH</span><span class="name">中芯国际</span></div>
+              <span class="board-tag kc">科创板</span>
+            </div>
+            <div class="code-item" data-code="510300.SH" data-name="沪深300ETF" data-board="etf">
+              <div><span class="code">510300.SH</span><span class="name">沪深300ETF</span></div>
+              <span class="board-tag etf">ETF</span>
+            </div>
+          </div>
+        </div>
+        <input type="number" placeholder="成本价" id="addCostInput" step="0.001" min="0">
+        <input type="number" placeholder="股数" id="addSharesInput" min="1" step="100">
+        <input type="text" placeholder="备注（可选）" id="addNotesInput">
+        <div class="add-form-actions">
+          <button class="btn-confirm" onclick="confirmAdd()"><i class="bi bi-check-lg"></i> 添加</button>
+          <button class="btn-cancel" onclick="cancelAdd()">取消</button>
+        </div>
+      </div>
+    </td>
+  </tr>
+</template>
+
+<!-- Toast -->
+<div class="toast-app" id="toast">
+  <i class="bi bi-check-circle-fill"></i>
+  <span id="toastText">操作成功</span>
+</div>
+
+<script>
+// 模拟数据
+const positions = [
+  {code: '600519.SH', name: '贵州茅台', board: 'hs', cost_price: 1680.00, shares: 100, cost_amount: 168000, current: 1820.00, pct_chg: 1.20, today_profit: 2160, today_profit_pct: 1.20, profit: 14000, profit_pct: 8.33, notes: '长线持有 · 价值投资'},
+  {code: '000858.SZ', name: '五粮液', board: 'hs', cost_price: 158.00, shares: 1000, cost_amount: 158000, current: 162.50, pct_chg: -0.61, today_profit: -1000, today_profit_pct: -0.61, profit: 4500, profit_pct: 2.85, notes: '白酒板块轮动'},
+  {code: '300750.SZ', name: '宁德时代', board: 'cy', cost_price: 380.00, shares: 300, cost_amount: 114000, current: 425.00, pct_chg: 2.15, today_profit: 2682, today_profit_pct: 2.15, profit: 13500, profit_pct: 11.84, notes: '新能源主线'},
+  {code: '688981.SH', name: '中芯国际', board: 'kc', cost_price: 95.00, shares: 800, cost_amount: 76000, current: 88.20, pct_chg: -1.45, today_profit: -1035, today_profit_pct: -1.45, profit: -5440, profit_pct: -7.16, notes: '半导体周期'},
+  {code: '510300.SH', name: '沪深300ETF', board: 'etf', cost_price: 4.250, shares: 50000, cost_amount: 212500, current: 4.478, pct_chg: 0.61, today_profit: 5670, today_profit_pct: 0.61, profit: 11400, profit_pct: 5.37, notes: '指数底仓'},
+];
+
+let expandedRow = null;
+let editingCell = null;
+let addFormVisible = false;
+
+function fmtNum(v, decimals = 2) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  return Number(v).toLocaleString('zh-CN', {maximumFractionDigits: decimals, minimumFractionDigits: decimals});
+}
+
+function fmtPct(v) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  const sign = v > 0 ? '+' : '';
+  return sign + Number(v).toFixed(2) + '%';
+}
+
+function fmtMoney(v) {
+  if (v === null || v === undefined || isNaN(v)) return '-';
+  const sign = v > 0 ? '+' : '';
+  return sign + '¥' + Math.abs(Number(v)).toLocaleString('zh-CN', {maximumFractionDigits: 0});
+}
+
+function colorClass(v) {
+  if (v === null || v === undefined || isNaN(v) || v === 0) return 'num-flat';
+  return v > 0 ? 'num-up' : 'num-down';
+}
+
+function boardTag(board) {
+  const map = {hs: '沪深', cy: '创业板', kc: '科创板', etf: 'ETF'};
+  return map[board] || '';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('posTbody');
+  let html = positions.map((p, i) => `
+    <tr onclick="toggleRow(${i})" id="row-${i}">
+      <td>
+        <div class="stock-cell">
+          <span class="stock-code">
+            ${p.code}
+            <span class="board-tag ${p.board}">${boardTag(p.board)}</span>
+          </span>
+          <span class="stock-name">${p.name}</span>
+        </div>
+      </td>
+      <td class="text-right">
+        <span class="editable-cell" data-field="cost_price" data-index="${i}" onclick="startEdit(event, this)">
+          ${fmtNum(p.cost_price, 3)}
+        </span>
+      </td>
+      <td class="text-right">
+        <span class="editable-cell" data-field="shares" data-index="${i}" onclick="startEdit(event, this)">
+          ${fmtNum(p.shares, 0)}
+        </span>
+      </td>
+      <td class="text-right">${fmtNum(p.current, 3)}</td>
+      <td class="text-right ${colorClass(p.pct_chg)}">${fmtPct(p.pct_chg)}</td>
+      <td class="text-right ${colorClass(p.profit_pct)}">${fmtPct(p.profit_pct)}</td>
+      <td class="text-right ${colorClass(p.profit)}" style="font-weight:700">${fmtMoney(p.profit)}</td>
+      <td class="text-center" onclick="event.stopPropagation()">
+        <button class="action-trigger" onclick="toggleActionMenu(event, ${i})"><i class="bi bi-three-dots"></i></button>
+      </td>
+    </tr>
+    <tr class="detail-row" id="detail-${i}" style="display:none">
+      <td colspan="8">
+        <div class="detail-content">
+          <div class="detail-item">
+            <span class="detail-label">成本金额</span>
+            <span class="detail-value">¥${fmtNum(p.cost_amount, 0)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">今日盈亏</span>
+            <span class="detail-value ${p.today_profit >= 0 ? 'up' : 'down'}">${fmtMoney(p.today_profit)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">今日盈亏率</span>
+            <span class="detail-value ${p.today_profit_pct >= 0 ? 'up' : 'down'}">${fmtPct(p.today_profit_pct)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">备注</span>
+            <span class="detail-value notes">${p.notes || '无'}</span>
+          </div>
+          <div class="detail-actions">
+            <button class="btn-sm-app edit" onclick="showToast('编辑弹窗（备选方案）', 'info')"><i class="bi bi-pencil"></i> 完整编辑</button>
+            <button class="btn-sm-app danger" onclick="deletePosition(${i})"><i class="bi bi-trash3"></i> 删除持仓</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  // 末行添加
+  if (!addFormVisible) {
+    html += `
+      <tr class="add-row" onclick="showAddForm()">
+        <td colspan="8">
+          <span class="add-icon"><i class="bi bi-plus-lg"></i></span>
+          添加持仓
+        </td>
+      </tr>
+    `;
+  } else {
+    const tpl = document.getElementById('addFormTemplate');
+    html += tpl.innerHTML;
+  }
+  tbody.innerHTML = html;
+
+  // 绑定添加表单事件
+  if (addFormVisible) {
+    setupAddForm();
+  }
+
+  // 更新统计卡（红盈绿亏背景色动态切换）
+  updateStatCards();
+}
+
+// 根据盈亏正负动态切换今日盈亏/总盈亏卡片的背景色（红盈绿亏）
+function updateStatCards() {
+  const totalProfit = positions.reduce((s, p) => s + p.profit, 0);
+  const todayProfit = positions.reduce((s, p) => s + p.today_profit, 0);
+  const totalCost = positions.reduce((s, p) => s + p.cost_amount, 0);
+  const totalValue = positions.reduce((s, p) => s + p.current * p.shares, 0);
+  const totalProfitPct = totalCost > 0 ? (totalValue / totalCost - 1) * 100 : 0;
+  const todayProfitPct = totalValue > 0 ? todayProfit / (totalValue - todayProfit) * 100 : 0;
+
+  applyProfitCard('totalProfitCard', 'totalProfitValue', 'totalProfitSub', totalProfit, totalProfitPct);
+  applyProfitCard('todayProfitCard', 'todayProfitValue', 'todayProfitSub', todayProfit, todayProfitPct);
+}
+
+function applyProfitCard(cardId, valueId, subId, profit, pct) {
+  const card = document.getElementById(cardId);
+  const valEl = document.getElementById(valueId);
+  const subEl = document.getElementById(subId);
+  if (!card) return;
+  // 重置类名
+  card.classList.remove('accent-red', 'accent-green', 'accent-flat');
+  valEl.classList.remove('num-up', 'num-down', 'num-flat');
+  subEl.classList.remove('up', 'down');
+  // 切换背景色：盈红 亏绿 平灰
+  let cls, numCls, subCls, arrow;
+  if (profit > 0) {
+    cls = 'accent-red'; numCls = 'num-up'; subCls = 'up'; arrow = 'bi-arrow-up';
+  } else if (profit < 0) {
+    cls = 'accent-green'; numCls = 'num-down'; subCls = 'down'; arrow = 'bi-arrow-down';
+  } else {
+    cls = 'accent-flat'; numCls = 'num-flat'; subCls = ''; arrow = 'bi-dash';
+  }
+  card.classList.add(cls);
+  valEl.classList.add(numCls);
+  if (subCls) subEl.classList.add(subCls);
+  valEl.textContent = fmtMoney(profit);
+  subEl.innerHTML = `<i class="bi ${arrow}"></i> ${fmtPct(pct)}`;
+}
+
+function toggleRow(i) {
+  // 如果正在编辑，不触发展开
+  if (editingCell !== null) return;
+  const detail = document.getElementById(`detail-${i}`);
+  const row = document.getElementById(`row-${i}`);
+  if (expandedRow === i) {
+    detail.style.display = 'none';
+    row.classList.remove('expanded');
+    expandedRow = null;
+  } else {
+    if (expandedRow !== null) {
+      document.getElementById(`detail-${expandedRow}`).style.display = 'none';
+      document.getElementById(`row-${expandedRow}`).classList.remove('expanded');
+    }
+    detail.style.display = '';
+    row.classList.add('expanded');
+    expandedRow = i;
+  }
+}
+
+// 行内编辑
+function startEdit(e, el) {
+  e.stopPropagation();
+  if (editingCell !== null) return;
+  editingCell = el;
+  const field = el.dataset.field;
+  const index = parseInt(el.dataset.index);
+  const p = positions[index];
+  const oldValue = field === 'cost_price' ? p.cost_price : p.shares;
+  const decimals = field === 'cost_price' ? 3 : 0;
+  el.classList.add('editing');
+  el.innerHTML = `<input type="number" value="${oldValue}" step="${field === 'cost_price' ? '0.001' : '100'}" min="${field === 'cost_price' ? '0' : '1'}">`;
+  const input = el.querySelector('input');
+  input.focus();
+  input.select();
+
+  function saveEdit() {
+    const newVal = parseFloat(input.value);
+    if (isNaN(newVal) || newVal <= 0) {
+      showToast('请输入有效数值', 'error');
+      cancelEdit();
+      return;
+    }
+    if (field === 'cost_price') p.cost_price = newVal;
+    else p.shares = newVal;
+    // 重算
+    p.cost_amount = p.cost_price * p.shares;
+    p.profit = (p.current - p.cost_price) * p.shares;
+    p.profit_pct = p.current / p.cost_price - 1;
+    editingCell = null;
+    renderTable();
+    showToast(`${field === 'cost_price' ? '成本价' : '持仓股数'}已更新为 ${newVal}`, 'success');
+  }
+
+  function cancelEdit() {
+    editingCell = null;
+    renderTable();
+  }
+
+  input.addEventListener('blur', saveEdit);
+  input.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); saveEdit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); cancelEdit(); }
+  });
+}
+
+function toggleActionMenu(e, i) {
+  e.stopPropagation();
+  showToast('操作菜单：完整编辑 / 删除', 'info');
+}
+
+// 末行添加
+function showAddForm() {
+  addFormVisible = true;
+  renderTable();
+}
+
+function setupAddForm() {
+  const codeInput = document.getElementById('addCodeInput');
+  const dropdown = document.getElementById('addCodeDropdown');
+  codeInput.addEventListener('focus', () => dropdown.classList.add('show'));
+  codeInput.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('show'), 200));
+  codeInput.addEventListener('input', filterCodeItems);
+  document.querySelectorAll('#addCodeDropdown .code-item').forEach(item => {
+    item.addEventListener('click', () => {
+      codeInput.value = item.dataset.code + ' ' + item.dataset.name;
+      dropdown.classList.remove('show');
+    });
+  });
+  // 回车提交
+  ['addCostInput', 'addSharesInput', 'addNotesInput'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); confirmAdd(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); cancelAdd(); }
+    });
+  });
+}
+
+function filterCodeItems() {
+  const kw = document.getElementById('addCodeInput').value.toLowerCase();
+  document.querySelectorAll('#addCodeDropdown .code-item').forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(kw) ? '' : 'none';
+  });
+}
+
+function confirmAdd() {
+  const codeInput = document.getElementById('addCodeInput');
+  const costInput = document.getElementById('addCostInput');
+  const sharesInput = document.getElementById('addSharesInput');
+  const notesInput = document.getElementById('addNotesInput');
+  if (!codeInput.value.trim()) { showToast('请选择股票代码', 'error'); return; }
+  if (!costInput.value || parseFloat(costInput.value) <= 0) { showToast('请输入有效成本价', 'error'); return; }
+  if (!sharesInput.value || parseInt(sharesInput.value) <= 0) { showToast('请输入有效股数', 'error'); return; }
+
+  const parts = codeInput.value.split(' ');
+  const code = parts[0];
+  const name = parts.slice(1).join(' ') || '未知';
+  const board = code.startsWith('300') || code.startsWith('301') ? 'cy' :
+                code.startsWith('688') ? 'kc' :
+                code.startsWith('5') || code.startsWith('15') ? 'etf' : 'hs';
+  positions.push({
+    code, name, board,
+    cost_price: parseFloat(costInput.value),
+    shares: parseInt(sharesInput.value),
+    cost_amount: parseFloat(costInput.value) * parseInt(sharesInput.value),
+    current: parseFloat(costInput.value) * 1.05,
+    pct_chg: 0, today_profit: 0, today_profit_pct: 0,
+    profit: 0, profit_pct: 0,
+    notes: notesInput.value
+  });
+  addFormVisible = false;
+  renderTable();
+  showToast(`已添加 ${code} ${name}`, 'success');
+}
+
+function cancelAdd() {
+  addFormVisible = false;
+  renderTable();
+}
+
+function deletePosition(i) {
+  if (confirm(`确认删除 ${positions[i].code} ${positions[i].name} 的持仓？`)) {
+    positions.splice(i, 1);
+    renderTable();
+    showToast('持仓已删除', 'success');
+  }
+}
+
+function refreshQuotes() {
+  const btn = document.getElementById('refreshBtn');
+  const timeEl = document.getElementById('quoteTime');
+  const textEl = document.getElementById('quoteTimeText');
+  btn.classList.add('loading');
+  btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 加载中';
+  timeEl.className = 'quote-time loading';
+  textEl.textContent = '加载中...';
+
+  setTimeout(() => {
+    btn.classList.remove('loading');
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新行情';
+    timeEl.className = 'quote-time fresh';
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    textEl.textContent = '更新于 ' + hh + ':' + mm + ':' + ss;
+    // 模拟价格波动
+    positions.forEach(p => {
+      const delta = (Math.random() - 0.5) * 0.02;
+      p.current = p.current * (1 + delta);
+      p.pct_chg = delta * 100;
+      p.profit = (p.current - p.cost_price) * p.shares;
+      p.profit_pct = p.current / p.cost_price - 1;
+    });
+    renderTable();
+    showToast('行情已刷新', 'success');
+  }, 1200);
+}
+
+function showToast(text, type = 'success') {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  toast.className = 'toast-app ' + type + ' show';
+  const icon = toast.querySelector('i');
+  icon.className = type === 'success' ? 'bi bi-check-circle-fill' :
+                  type === 'error' ? 'bi bi-exclamation-circle-fill' :
+                  'bi bi-info-circle-fill';
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// 搜索过滤
+document.getElementById('searchInput').addEventListener('input', function() {
+  // 实际项目会过滤 positions 数组并重渲染
+});
+
+// 初始渲染
+renderTable();
+</script>
+</body>
+</html>
