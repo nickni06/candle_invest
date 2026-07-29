@@ -808,6 +808,11 @@ def get_kline_df(code, start_date, end_date, prefer_local=True, allow_network=Tr
     """
     code = str(code)
 
+    # best_df / best_source 初始化为 None，后续分支可能赋值
+    # （盈湖 partial / 本地 partial / 网络拉取 等场景）
+    best_df = None
+    best_source = None
+
     # 0. 优先读盈湖（Yinghu DB）：全市场统一存储，SQLite 索引快速判断覆盖范围
     # 注意：check_coverage 允许 end_date 向前偏差 5 天（处理周末/节假日），
     # 但返回的数据可能不包含 end_date 当天。此时不直接返回，继续走网络拉取
