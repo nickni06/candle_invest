@@ -155,7 +155,8 @@ def export_onnx(model_path: str, output_path: str, quantize: bool = True) -> dic
     Returns:
         dict: 含文件大小、量化状态、验证结果。
     """
-    device = get_device()
+    # ONNX 导出强制使用 CPU（MPS 不支持 NNPack 卷积导出）
+    device = torch.device('cpu')
     model = CandleCNN().to(device)
     state_dict = torch.load(model_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)

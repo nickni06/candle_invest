@@ -81,3 +81,10 @@ websockets==16.0
 Werkzeug==3.1.8
 xlrd==2.0.2
 yfinance==1.5.1
+
+# AI 模型依赖（CNN + XGBoost 融合买卖点信号）
+torch==2.6.0
+onnx==1.18.0
+onnxruntime==1.22.0
+xgboost==3.0.2
+scikit-learn==1.7.1

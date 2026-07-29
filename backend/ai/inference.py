@@ -113,6 +113,110 @@ def infer_onnx(model_path: str, input_data) -> float:
     return confidence
 
 
+class CNNInference:
+    """CNN 推理器，封装 ONNX / PyTorch 双模式推理。
+
+    被 model_server.py 使用，提供统一的 predict() 接口。
+    """
+
+    def __init__(self, model_path: str, use_onnx: bool = True):
+        """加载 CNN 模型。
+
+        Args:
+            model_path: .onnx 或 .pth 模型路径。
+            use_onnx: True 用 ONNX Runtime，False 用 PyTorch。
+        """
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f'CNN 模型不存在: {model_path}')
+
+        self.use_onnx = use_onnx
+        self.model_path = model_path
+
+        if use_onnx:
+            import onnxruntime as ort
+            self.sess = ort.InferenceSession(
+                model_path, providers=['CPUExecutionProvider']
+            )
+            self.input_name = self.sess.get_inputs()[0].name
+        else:
+            import torch
+            self.device = get_device()
+            self.model = CandleCNN().to(self.device)
+            state_dict = torch.load(
+                model_path, map_location=self.device, weights_only=True
+            )
+            self.model.load_state_dict(state_dict)
+            self.model.eval()
+
+        print(f'[cnn_infer] 模型已加载: {model_path} '
+              f'({"ONNX" if use_onnx else "PyTorch"})', flush=True)
+
+    def predict(self, input_data) -> float:
+        """对单样本推理，返回 0~1 置信度。
+
+        Args:
+            input_data: (20, 5) 或 (5, 20) 或 (1, 5, 20) numpy 数组。
+
+        Returns:
+            0~1 置信度（正样本概率）。
+        """
+        x = load_input(input_data)  # (1, 5, 20) float32
+
+        if self.use_onnx:
+            outputs = self.sess.run(None, {self.input_name: x})
+            confidence = float(outputs[0][0, 0])
+            # ONNX 导出时已含 Sigmoid，值应在 [0, 1]
+            if confidence < 0 or confidence > 1:
+                confidence = 1.0 / (1.0 + np.exp(-confidence))
+            return confidence
+        else:
+            import torch
+            x_tensor = torch.from_numpy(x).to(self.device)
+            with torch.no_grad():
+                logit = self.model(x_tensor)
+                confidence = torch.sigmoid(logit).item()
+            return confidence
+
+    def predict_batch(self, input_data) -> np.ndarray:
+        """对批量样本推理，返回 (N,) 置信度数组。
+
+        Args:
+            input_data: (N, 20, 5) 或 (N, 5, 20) numpy 数组。
+
+        Returns:
+            (N,) float32 数组，每个元素 0~1 置信度。
+        """
+        arr = np.asarray(input_data, dtype=np.float32)
+        # 统一转为 (N, 5, 20)
+        if arr.ndim == 2:
+            arr = arr[np.newaxis, ...]
+        if arr.ndim != 3:
+            raise ValueError(f'批量输入维度错误: {arr.shape}, 期望 (N, 20, 5) 或 (N, 5, 20)')
+        # 判断是 (N, 20, 5) 还是 (N, 5, 20)
+        if arr.shape[1] == SEQ_LEN and arr.shape[2] == NUM_FEATURES:
+            arr = np.transpose(arr, (0, 2, 1))  # (N, 5, 20)
+        elif arr.shape[1] == NUM_FEATURES and arr.shape[2] == SEQ_LEN:
+            pass  # 已是 (N, 5, 20)
+        else:
+            raise ValueError(f'批量输入形状不支持: {arr.shape}')
+
+        if self.use_onnx:
+            outputs = self.sess.run(None, {self.input_name: arr})
+            probs = outputs[0].reshape(-1)
+            # ONNX 导出时已含 Sigmoid，若值超出 [0,1] 则手动 sigmoid
+            mask = (probs < 0) | (probs > 1)
+            if mask.any():
+                probs[mask] = 1.0 / (1.0 + np.exp(-probs[mask]))
+            return probs.astype(np.float32)
+        else:
+            import torch
+            x_tensor = torch.from_numpy(arr).to(self.device)
+            with torch.no_grad():
+                logits = self.model(x_tensor)
+                probs = torch.sigmoid(logits).reshape(-1)
+            return probs.cpu().numpy().astype(np.float32)
+
+
 def main():
     parser = argparse.ArgumentParser(description='1D-CNN K 线形态识别推理')
     parser.add_argument('--model', required=True, help='模型路径 (.pth 或 .onnx)')

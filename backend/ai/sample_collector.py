@@ -7,10 +7,15 @@
         → 用未来 5 日表现 + ATR(100) 打标签
         → 按标的分文件存 .npy
 
-标签定义（N=5, ATR period=100）:
-    正样本(1): 未来5日涨幅 > 1.5×ATR(100) 且 期间最大回撤 > -5%
-    负样本(0): 未来5日涨幅 < 0 或 期间最大回撤 < -8%
+标签定义（N=5, ATR period=100，与 config.py 保持一致）:
+    正样本(1): 未来5日涨幅 > 1.0×ATR(100) 且 期间最大回撤 > -8%（软过滤）
+    负样本(0): 未来5日涨幅 ≤ 0
     模糊样本: 丢弃（避免污染标签边界）
+
+参数来源优先级:
+    1. 函数参数（显式传入）
+    2. config.py 的 AI_SAMPLE_* 配置
+    3. 模块常量（本文件顶部）
 """
 from __future__ import annotations
 
@@ -34,13 +39,20 @@ from ai.cnn_model import SEQ_LEN, NUM_FEATURES, FEATURE_NAMES  # noqa: E402
 logger = logging.getLogger('trader_system')
 
 # ============================================================================
-# 标签生成参数
+# 标签生成参数（默认值，优先从 config 读取）
 # ============================================================================
-FORWARD_DAYS = 5              # 未来窗口 N
-ATR_PERIOD = 100              # ATR 计算周期
-ATR_MULTIPLIER = 1.5          # 正样本涨幅阈值 = ATR × 1.5
-MAX_DRAWDOWN_POS = -0.05      # 正样本：期间最大回撤 > -5%
-MAX_DRAWDOWN_NEG = -0.08      # 负样本：期间最大回撤 < -8%
+# 尝试从 config 读取，失败用默认值
+try:
+    from config import config as _cfg
+    FORWARD_DAYS = getattr(_cfg, 'AI_SAMPLE_FORWARD_DAYS', 5)
+    ATR_PERIOD = getattr(_cfg, 'AI_SAMPLE_ATR_PERIOD', 100)
+    ATR_MULTIPLIER = getattr(_cfg, 'AI_SAMPLE_ATR_MULTIPLIER', 1.0)
+    MAX_DRAWDOWN_SOFT = getattr(_cfg, 'AI_SAMPLE_MAX_DRAWDOWN', -0.08)
+except ImportError:
+    FORWARD_DAYS = 5
+    ATR_PERIOD = 100
+    ATR_MULTIPLIER = 1.0
+    MAX_DRAWDOWN_SOFT = -0.08
 
 # 切窗所需的前置 K 线数：ATR(100) 需要 100 根，窗口 20 根，未来 5 根
 MIN_HISTORY = ATR_PERIOD + SEQ_LEN + FORWARD_DAYS  # 125 根
@@ -141,6 +153,16 @@ def compute_label(future_close: np.ndarray, future_high: np.ndarray,
                   atr_value: float) -> Optional[int]:
     """根据未来 N 日表现 + ATR 生成标签。
 
+    标签规则（与 config.py 一致）:
+        正样本(1): 未来N日涨幅 > ATR×1.0 且 期间最大回撤 > -8%（软过滤）
+        负样本(0): 未来N日涨幅 ≤ 0
+        模糊样本: None（丢弃）
+
+    「软过滤」说明:
+        回撤 > -8% 作为正样本的硬条件之一（不是二次过滤）。
+        这样既保证正样本质量（避免大回撤的假信号），
+        又不会因回撤约束太松（如 -5%）导致正样本率过低。
+
     Args:
         future_close: 未来 N 日的 close 序列（长度 N）
         future_high: 未来 N 日的 high 序列
@@ -161,20 +183,21 @@ def compute_label(future_close: np.ndarray, future_high: np.ndarray,
     # 用 future_low 计算最坏情况
     max_drawdown = (future_low.min() - entry_close) / entry_close
 
-    # 正样本：涨幅 > 1.5×ATR 占比 且 回撤 > -5%
-    # 注意 ATR 是绝对价格单位，需转为相对 entry_close 的比例
+    # ATR 转为相对 entry_close 的比例
     atr_ratio = atr_value / entry_close
-    is_positive = (future_return > ATR_MULTIPLIER * atr_ratio
-                   and max_drawdown > MAX_DRAWDOWN_POS)
 
-    # 负样本：涨幅 < 0 或 回撤 < -8%
-    is_negative = (future_return < 0 or max_drawdown < MAX_DRAWDOWN_NEG)
+    # 正样本：涨幅 > ATR×1.0 且 回撤 > -8%
+    is_positive = (future_return > ATR_MULTIPLIER * atr_ratio
+                   and max_drawdown > MAX_DRAWDOWN_SOFT)
+
+    # 负样本：涨幅 ≤ 0
+    is_negative = (future_return <= 0)
 
     if is_positive:
         return 1
     if is_negative:
         return 0
-    return None  # 模糊区，丢弃
+    return None  # 模糊区（涨幅在 0 ~ ATR×1.0 之间），丢弃
 
 
 # ============================================================================
@@ -339,26 +362,78 @@ def collect_and_save(code_list: list[str],
 # ============================================================================
 # CLI 入口
 # ============================================================================
+def _load_default_codes_from_stock_data(n: int = 50) -> list[str]:
+    """从 stock_data.csv 随机抽取 n 只 A 股代码。
+
+    Args:
+        n: 抽取数量，0 表示全部。
+
+    Returns:
+        代码列表，如 ['000001.SZ', '600519.SH', ...]
+    """
+    try:
+        from config import config
+        csv_path = str(config.STOCK_DATA_FILE)
+    except Exception:
+        return ['000001.SZ', '600000.SH', '000300.SH']
+
+    if not os.path.exists(csv_path):
+        return ['000001.SZ', '600000.SH', '000300.SH']
+
+    try:
+        df = pd.read_csv(csv_path, dtype={'ts_code': str})
+        # 排除北交所
+        codes = df[~df['ts_code'].str.endswith('.BJ')]['ts_code'].tolist()
+        if n > 0 and len(codes) > n:
+            codes = np.random.default_rng(42).choice(codes, size=n, replace=False).tolist()
+        return codes
+    except Exception as e:
+        print(f'[采集] 读取 stock_data.csv 失败: {e}', flush=True)
+        return ['000001.SZ', '600000.SH', '000300.SH']
+
+
 def main():
-    """命令行入口：从环境变量读取参数采集样本。"""
+    """命令行入口：从环境变量或 config 读取参数采集样本。
+
+    环境变量（优先级最高）:
+        CODE_LIST: 逗号分隔的标的代码列表（覆盖默认随机抽取）
+        N_CODES:   默认标的抽取数量（默认读 config.AI_SAMPLE_DEFAULT_CODES=50）
+        START_DATE: 起始日期 YYYYMMDD
+        END_DATE:   结束日期 YYYYMMDD
+        OUTPUT_DIR: 输出目录
+    """
     import json
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
-    # 默认用几只代表性标的做端到端验证
-    code_list_str = os.environ.get('CODE_LIST', '000001.SZ,600000.SH,000300.SH')
-    code_list = [c.strip() for c in code_list_str.split(',') if c.strip()]
-    start_date = os.environ.get('START_DATE', '20200101')
-    end_date = os.environ.get('END_DATE', '20241231')
-
-    # 输出目录：优先用 config 中的训练目录，兜底用 backend/ai/data
+    # 1. 读取配置（优先环境变量，其次 config.py，最后硬编码兜底）
     try:
         from config import config
-        output_dir = str(config.TRAIN_DATA_A_DIR)
+        default_n = getattr(config, 'AI_SAMPLE_DEFAULT_CODES', 50)
+        default_start = getattr(config, 'AI_SAMPLE_START_DATE', '20100101')
+        default_end = getattr(config, 'AI_SAMPLE_END_DATE', '20260727')
+        default_output = str(getattr(config, 'AI_SAMPLE_DIR',
+                                     _THIS_DIR / 'data' / 'train'))
     except Exception:
-        output_dir = str(_THIS_DIR / 'data' / 'train')
+        default_n = 50
+        default_start = '20100101'
+        default_end = '20260727'
+        default_output = str(_THIS_DIR / 'data' / 'train')
 
-    print(f'[采集] 配置: codes={code_list}, start={start_date}, end={end_date}')
+    code_list_str = os.environ.get('CODE_LIST', '')
+    if code_list_str:
+        code_list = [c.strip() for c in code_list_str.split(',') if c.strip()]
+    else:
+        n_codes = int(os.environ.get('N_CODES', default_n))
+        code_list = _load_default_codes_from_stock_data(n_codes)
+
+    start_date = os.environ.get('START_DATE', default_start)
+    end_date = os.environ.get('END_DATE', default_end)
+    output_dir = os.environ.get('OUTPUT_DIR', default_output)
+
+    print(f'[采集] 配置: codes={len(code_list)}只, start={start_date}, end={end_date}')
     print(f'[采集] 输出目录: {output_dir}')
+    if code_list:
+        print(f'[采集] 前 5 只: {code_list[:5]}')
 
     stats = collect_and_save(code_list, start_date, end_date, output_dir)
     print(f'[采集] 统计: {json.dumps(stats, ensure_ascii=False, indent=2)}')
