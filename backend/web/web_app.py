@@ -11,7 +11,7 @@ import time
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response, send_file, send_from_directory
 
 from config import config
 
@@ -3708,6 +3708,48 @@ def api_signal_update_quality_download():
 
 def create_app():
     return app
+
+
+# ============================================================================
+# 项目文档 Wiki 路由
+# ============================================================================
+_DOCS_DIR = config.BASE_DIR / 'docs'
+_DOCS_LIST = [
+    {'name': 'WIKI', 'title': '综合 Wiki', 'icon': '📚'},
+    {'name': 'architecture', 'title': '系统架构', 'icon': '🏗️'},
+    {'name': 'data-source', 'title': '数据源与盈湖', 'icon': '💾'},
+    {'name': 'strategy-signals', 'title': '策略与信号', 'icon': '📊'},
+    {'name': 'ai-model', 'title': 'AI 模型', 'icon': '🤖'},
+    {'name': 'deployment', 'title': '部署运维', 'icon': '🚀'},
+]
+
+
+@app.route('/api/docs')
+def api_docs_list():
+    """返回文档列表"""
+    return jsonify({'docs': _DOCS_LIST})
+
+
+@app.route('/api/docs/<doc_name>')
+def api_docs_get(doc_name):
+    """返回单个文档的 markdown 原文"""
+    # 安全检查：只允许字母、数字、连字符
+    if not doc_name or not all(c.isalnum() or c == '-' for c in doc_name):
+        return jsonify({'error': '非法文档名'}), 400
+    doc_path = _DOCS_DIR / f'{doc_name}.md'
+    if not doc_path.exists():
+        return jsonify({'error': f'文档不存在: {doc_name}'}), 404
+    try:
+        content = doc_path.read_text('utf-8')
+        return jsonify({'content': content, 'name': doc_name})
+    except Exception as e:
+        return jsonify({'error': f'读取失败: {e}'}), 500
+
+
+@app.route('/docs/assets/<path:filename>')
+def docs_assets(filename):
+    """文档图片资源服务"""
+    return send_from_directory(_DOCS_DIR / 'assets', filename)
 
 
 if __name__ == '__main__':

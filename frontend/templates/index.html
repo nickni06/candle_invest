@@ -259,6 +259,223 @@
             margin-top: auto;
         }
 
+        /* ========== 项目文档 Wiki ========== */
+        .docs-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 1.5rem;
+            min-height: calc(100vh - 140px);
+        }
+        .docs-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: sticky;
+            top: 1.75rem;
+            max-height: calc(100vh - 3.5rem);
+            overflow: hidden;
+        }
+        .docs-sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--apple-card-bg);
+            border: 1px solid var(--apple-border-light);
+            border-radius: var(--apple-radius);
+        }
+        .docs-sidebar-header i { color: var(--apple-text-tertiary); font-size: 13px; }
+        .docs-sidebar-header input {
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            color: var(--apple-text-primary);
+            outline: none;
+            flex: 1;
+            min-width: 0;
+        }
+        .docs-list {
+            background: var(--apple-card-bg);
+            border: 1px solid var(--apple-border-light);
+            border-radius: var(--apple-radius);
+            overflow-y: auto;
+            max-height: 40vh;
+        }
+        .docs-list-item {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--apple-text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--apple-border-light);
+            transition: background 0.15s ease;
+        }
+        .docs-list-item:last-child { border-bottom: none; }
+        .docs-list-item:hover { background: rgba(0, 113, 227, 0.04); }
+        .docs-list-item.active {
+            background: rgba(0, 113, 227, 0.08);
+            color: var(--apple-blue);
+            font-weight: 600;
+        }
+        .docs-list-item .docs-icon { font-size: 14px; }
+        .docs-toc {
+            background: var(--apple-card-bg);
+            border: 1px solid var(--apple-border-light);
+            border-radius: var(--apple-radius);
+            padding: 12px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .docs-toc-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--apple-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 8px;
+            padding: 0 4px;
+        }
+        .docs-toc-empty {
+            font-size: 12px;
+            color: var(--apple-text-tertiary);
+            padding: 8px 4px;
+        }
+        .docs-toc-item {
+            display: block;
+            padding: 5px 8px;
+            font-size: 12px;
+            color: var(--apple-text-secondary);
+            text-decoration: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            line-height: 1.4;
+        }
+        .docs-toc-item:hover { background: rgba(0,0,0,0.04); color: var(--apple-text-primary); }
+        .docs-toc-item.active { background: rgba(0,113,227,0.1); color: var(--apple-blue); font-weight: 500; }
+        .docs-toc-item.level-2 { padding-left: 16px; font-size: 11px; }
+        .docs-toc-item.level-3 { padding-left: 28px; font-size: 11px; color: var(--apple-text-tertiary); }
+        .docs-reader {
+            background: var(--apple-card-bg);
+            border: 1px solid var(--apple-border-light);
+            border-radius: var(--apple-radius-lg);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .docs-reader-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.75rem;
+            border-bottom: 1px solid var(--apple-border-light);
+            position: sticky;
+            top: 0;
+            background: var(--apple-card-bg);
+            z-index: 5;
+        }
+        .docs-reader-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--apple-text-primary);
+        }
+        .docs-reader-actions { display: flex; gap: 6px; }
+        .docs-nav-btn {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--apple-border-light);
+            background: transparent;
+            color: var(--apple-text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .docs-nav-btn:hover:not(:disabled) { border-color: var(--apple-blue); color: var(--apple-blue); }
+        .docs-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .markdown-body {
+            padding: 2rem 2.5rem;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--apple-text-primary);
+            overflow-y: auto;
+            max-width: 860px;
+        }
+        .markdown-body h1 { font-size: 24px; font-weight: 700; margin: 0 0 1rem; color: var(--apple-text-primary); }
+        .markdown-body h2 { font-size: 20px; font-weight: 600; margin: 2rem 0 0.8rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--apple-border-light); }
+        .markdown-body h3 { font-size: 16px; font-weight: 600; margin: 1.5rem 0 0.6rem; color: var(--apple-text-primary); }
+        .markdown-body h4 { font-size: 14px; font-weight: 600; margin: 1.2rem 0 0.5rem; color: var(--apple-text-secondary); }
+        .markdown-body p { margin: 0.6rem 0; }
+        .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin: 0.6rem 0; }
+        .markdown-body li { margin: 0.3rem 0; }
+        .markdown-body code {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "SF Mono", Monaco, monospace;
+            font-size: 12px;
+            color: #c7254e;
+        }
+        .markdown-body pre {
+            background: #1d1d1f;
+            color: #f5f5f7;
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .markdown-body pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+            font-size: 12px;
+        }
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 13px;
+        }
+        .markdown-body th, .markdown-body td {
+            padding: 8px 12px;
+            border: 1px solid var(--apple-border-light);
+            text-align: left;
+        }
+        .markdown-body th { background: rgba(0,0,0,0.03); font-weight: 600; }
+        .markdown-body tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+        .markdown-body img {
+            max-width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin: 1rem 0;
+        }
+        .markdown-body blockquote {
+            border-left: 3px solid var(--apple-blue);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: var(--apple-text-secondary);
+            font-style: italic;
+        }
+        .markdown-body a { color: var(--apple-blue); text-decoration: none; }
+        .markdown-body a:hover { text-decoration: underline; }
+        .markdown-body hr { border: none; border-top: 1px solid var(--apple-border-light); margin: 2rem 0; }
+        .docs-loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--apple-text-tertiary);
+        }
+        .docs-loading i { font-size: 48px; margin-bottom: 1rem; display: block; opacity: 0.3; }
+        .docs-loading div { font-size: 14px; }
+        @media (max-width: 900px) {
+            .docs-layout { grid-template-columns: 1fr; }
+            .docs-sidebar { position: relative; top: 0; max-height: none; }
+            .docs-list { max-height: 200px; }
+            .markdown-body { padding: 1.5rem; }
+        }
+
         /* ========== 统计卡片（仪表盘）—— 白底左侧彩边 ========== */
         .stat-card {
             padding: 1.5rem 1.75rem; border-radius: var(--apple-radius-lg);
@@ -1777,6 +1994,27 @@
         }
         .bt-pm-item .bt-pm-value.up { color: #ff3b30; }
         .bt-pm-item .bt-pm-value.down { color: #34c759; }
+        /* AI 过滤对照项 */
+        .bt-pm-item.ai-filter-item {
+            border-left: 1px dashed var(--apple-border-light);
+            padding-left: 10px;
+            margin-left: 4px;
+        }
+        .bt-pm-item.ai-filter-item .bt-pm-label {
+            color: transparent;
+            background: linear-gradient(135deg, #0071e3 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            font-weight: 600;
+        }
+        .bt-pm-item.ai-filter-item .bt-pm-sub {
+            font-size: .65rem;
+            color: var(--apple-text-tertiary);
+            margin-top: .1rem;
+            font-weight: 400;
+        }
+        .bt-pm-item.ai-filter-item .bt-pm-sub.up { color: #ff3b30; }
+        .bt-pm-item.ai-filter-item .bt-pm-sub.warn { color: #ff9500; }
 
         /* --- 形态详情（展开） --- */
         .bt-pattern-detail {
@@ -3319,6 +3557,65 @@
             margin: 4px 0;
         }
 
+        /* ⭐ AI 评分行（克制版：融入数据流，蓝紫渐变仅用于标题文字） */
+        .sr-ai-box {
+            padding: 8px 13px;
+            border-top: 1px solid var(--apple-border-light);
+        }
+        .sr-ai-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: transparent;
+            background: linear-gradient(135deg, #0071e3 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            margin-bottom: 5px;
+            letter-spacing: 0.3px;
+        }
+        .sr-ai-items {
+            display: flex;
+            gap: 14px;
+        }
+        .sr-ai-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sr-ai-name {
+            font-size: 11px;
+            color: var(--apple-text-secondary);
+            min-width: 56px;
+            font-weight: 500;
+        }
+        .sr-ai-bar {
+            flex: 1;
+            height: 2px;
+            background: #ededf0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .sr-ai-bar-fill {
+            height: 100%;
+            background: #86868b;
+            border-radius: 999px;
+            transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sr-ai-bar-fill.strong {
+            background: var(--apple-blue);
+        }
+        .sr-ai-val {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--apple-text-secondary);
+            min-width: 32px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .sr-ai-val.strong {
+            color: var(--apple-blue);
+        }
+
         /* 含义 */
         .sr-desc {
             padding: 0 13px 11px;
@@ -4637,6 +4934,16 @@
                 <div class="nav-text">
                     <div>系统配置</div>
                     <div class="nav-desc">参数与设置查看</div>
+                </div>
+            </a>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-title">文档</div>
+            <a class="nav-link" data-tab="docs" href="#">
+                <i class="bi bi-book"></i>
+                <div class="nav-text">
+                    <div>项目文档</div>
+                    <div class="nav-desc">Wiki 架构与使用指南</div>
                 </div>
             </a>
         </div>
@@ -5960,6 +6267,44 @@
                 </div>
             </div>
         </div>
+
+        <!-- 项目文档 Wiki -->
+        <div class="tab-pane" id="tab-docs">
+            <div class="docs-layout">
+                <aside class="docs-sidebar">
+                    <div class="docs-sidebar-header">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="docsSearch" placeholder="搜索文档..." oninput="filterDocsList(this.value)">
+                    </div>
+                    <div class="docs-list" id="docsList">
+                        <!-- 文档列表由 JS 渲染 -->
+                    </div>
+                    <div class="docs-toc" id="docsToc">
+                        <div class="docs-toc-title">目录</div>
+                        <div class="docs-toc-empty">选择文档后显示目录</div>
+                    </div>
+                </aside>
+                <main class="docs-reader">
+                    <div class="docs-reader-header">
+                        <div class="docs-reader-title" id="docsReaderTitle">项目文档</div>
+                        <div class="docs-reader-actions">
+                            <button class="docs-nav-btn" id="docPrevBtn" onclick="navDoc(-1)" disabled>
+                                <i class="bi bi-chevron-left"></i> 上一章
+                            </button>
+                            <button class="docs-nav-btn" id="docNextBtn" onclick="navDoc(1)" disabled>
+                                下一章 <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <article class="markdown-body" id="docsContent">
+                        <div class="docs-loading">
+                            <i class="bi bi-book"></i>
+                            <div>选择左侧文档开始阅读</div>
+                        </div>
+                    </article>
+                </main>
+            </div>
+        </div>
     </div>
     <div class="page-footer">
         <span>基于 Backtrader + TA-Lib 构建</span>
@@ -6208,6 +6553,9 @@ document.querySelectorAll('.sidebar .nav-link').forEach(link => {
         }
         if (tab === 'performance') suInit();
         if (tab === 'yinghu') refreshMarketDbStats();
+        if (tab === 'docs') {
+            if (_docsList.length === 0) loadDocsList();
+        }
     });
 });
 
@@ -6223,6 +6571,7 @@ document.querySelectorAll('.sidebar .nav-link').forEach(link => {
         '#tab-settings > *',                 // 系统设置顶层
         '#tab-syslog > *',                   // 系统日志顶层
         '#tab-yinghu > *',                   // 盈湖管理顶层
+        '#tab-docs > *',                    // 项目文档顶层
     ];
     // 去重收集
     const seen = new Set();
@@ -6390,6 +6739,188 @@ async function api(method, url, body) {
         throw new Error(data.error || `请求失败 (${res.status})`);
     }
     return data;
+}
+
+// ============================================================================
+// 项目文档 Wiki
+// ============================================================================
+let _docsList = [];
+let _currentDocIdx = -1;
+
+// 加载文档列表
+async function loadDocsList() {
+    try {
+        const res = await api('GET', '/api/docs');
+        _docsList = res.docs || [];
+        renderDocsList(_docsList);
+    } catch (e) {
+        console.error('[docs] 加载文档列表失败:', e);
+        document.getElementById('docsList').innerHTML = '<div style="padding:14px;font-size:12px;color:#ff3b30">加载失败</div>';
+    }
+}
+
+function renderDocsList(docs) {
+    const html = docs.map((d, i) => `
+        <div class="docs-list-item${i === _currentDocIdx ? ' active' : ''}" data-idx="${i}" onclick="selectDoc(${i})">
+            <span class="docs-icon">${d.icon}</span>
+            <span>${d.title}</span>
+        </div>
+    `).join('');
+    document.getElementById('docsList').innerHTML = html || '<div style="padding:14px;font-size:12px;color:#86868b">暂无文档</div>';
+}
+
+function filterDocsList(keyword) {
+    if (!keyword) {
+        renderDocsList(_docsList);
+        return;
+    }
+    const filtered = _docsList.filter(d => d.title.toLowerCase().includes(keyword.toLowerCase()));
+    renderDocsList(filtered);
+}
+
+async function selectDoc(idx) {
+    if (idx < 0 || idx >= _docsList.length) return;
+    _currentDocIdx = idx;
+    const doc = _docsList[idx];
+    // 高亮列表项
+    renderDocsList(_docsList);
+    // 更新标题
+    document.getElementById('docsReaderTitle').textContent = `${doc.icon} ${doc.title}`;
+    // 显示加载中
+    const content = document.getElementById('docsContent');
+    content.innerHTML = '<div class="docs-loading"><i class="bi bi-arrow-clockwise"></i><div>加载中...</div></div>';
+    // 更新前后导航按钮状态
+    document.getElementById('docPrevBtn').disabled = (idx === 0);
+    document.getElementById('docNextBtn').disabled = (idx === _docsList.length - 1);
+    try {
+        const res = await api('GET', `/api/docs/${doc.name}`);
+        renderDocContent(res.content, doc.name);
+        // 前端操作日志
+        logFrontend('view_doc', doc.name, 'docs');
+    } catch (e) {
+        content.innerHTML = `<div class="docs-loading"><i class="bi bi-exclamation-circle"></i><div>加载失败: ${e.message}</div></div>`;
+    }
+}
+
+function navDoc(direction) {
+    const newIdx = _currentDocIdx + direction;
+    if (newIdx >= 0 && newIdx < _docsList.length) {
+        selectDoc(newIdx);
+    }
+}
+
+// 简易 markdown 渲染（避免引入 marked.js，支持基础语法）
+function renderDocContent(md, docName) {
+    const content = document.getElementById('docsContent');
+    // 转义 HTML
+    let html = md
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // 代码块（```...```）
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
+        return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
+    });
+
+    // 行内代码 `code`
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+    // 标题 # ## ### ####
+    html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+
+    // 分割线
+    html = html.replace(/^---+$/gm, '<hr>');
+
+    // 引用
+    html = html.replace(/^&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // 无序列表
+    html = html.replace(/^[\s]*[-*+]\s+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, '<ul>$1</ul>');
+
+    // 有序列表
+    html = html.replace(/^\d+\.\s+(.+)$/gm, '<li class="ol">$1</li>');
+    html = html.replace(/(<li class="ol">[\s\S]*?<\/li>)(?!\s*<li)/g, '<ol>$1</ol>');
+    html = html.replace(/<li class="ol">/g, '<li>');
+
+    // 表格 | a | b |
+    html = html.replace(/^\|(.+)\|$/gm, (match) => {
+        const cells = match.split('|').filter(c => c.trim() !== '');
+        if (cells.every(c => /^[\s-:]+$/.test(c))) return ''; // 分割行
+        const isHeader = match.indexOf('---') >= 0;
+        const tag = isHeader ? 'th' : 'td';
+        return '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+    });
+    html = html.replace(/(<tr>[\s\S]*?<\/tr>)(?!\s*<tr>)/g, '<table>$1</table>');
+
+    // 链接 [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+    // 图片 ![alt](url)
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => {
+        // 相对路径补全
+        if (url.startsWith('assets/') || !url.startsWith('http')) {
+            url = `/docs/assets/${url.replace(/^assets\//, '')}`;
+        }
+        return `<img alt="${alt}" src="${url}">`;
+    });
+
+    // 段落：连续非标签行包裹 <p>
+    html = html.replace(/^(?!<[hupoltb]|<\/|<hr|<li|<tr|<td|<th)(.+)$/gm, '<p>$1</p>');
+
+    // 合并连续空行
+    html = html.replace(/\n+/g, '\n');
+
+    content.innerHTML = html;
+
+    // 生成目录（基于 h1-h3）
+    generateDocToc(content);
+
+    // 滚动到顶部
+    content.scrollTop = 0;
+}
+
+function generateDocToc(container) {
+    const headings = container.querySelectorAll('h1, h2, h3');
+    const tocEl = document.getElementById('docsToc');
+    if (headings.length === 0) {
+        tocEl.innerHTML = '<div class="docs-toc-title">目录</div><div class="docs-toc-empty">无标题</div>';
+        return;
+    }
+    let html = '<div class="docs-toc-title">目录</div>';
+    headings.forEach((h, i) => {
+        const id = `doc-heading-${i}`;
+        h.id = id;
+        const level = h.tagName.toLowerCase();
+        const text = h.textContent.replace(/[#*`]/g, '').trim();
+        html += `<a class="docs-toc-item level-${level === 'h1' ? 1 : level === 'h2' ? 2 : 3}" data-target="${id}" onclick="scrollToHeading('${id}')">${text}</a>`;
+    });
+    tocEl.innerHTML = html;
+
+    // scrollspy
+    const reader = document.querySelector('.markdown-body');
+    reader.onscroll = () => {
+        let activeId = null;
+        headings.forEach(h => {
+            if (h.offsetTop - 80 <= reader.scrollTop) {
+                activeId = h.id;
+            }
+        });
+        tocEl.querySelectorAll('.docs-toc-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.target === activeId);
+        });
+    };
+}
+
+function scrollToHeading(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reader = document.querySelector('.markdown-body');
+    reader.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
 }
 
 // 前端操作日志上报：将用户关键操作写入后端日志，实现前端操作完整可追踪
@@ -7934,6 +8465,18 @@ function renderPatternList(patterns) {
         html += '          <div class="bt-pm-label">交易</div>';
         html += `          <div class="bt-pm-value" style="color:var(--apple-text-secondary)">${p.total_trades || 0}</div>`;
         html += '        </div>';
+        // AI 过滤对照
+        const aiFilter = p.ai_filter;
+        if (aiFilter && aiFilter.enabled) {
+            const aiRetCls = aiFilter.return_pct >= 0 ? 'up' : 'down';
+            const aiWinCls = aiFilter.win_rate >= 50 ? 'up' : (aiFilter.win_rate > 0 ? 'warn' : '');
+            const filterRate = Math.round(aiFilter.filter_rate * 100);
+            html += '        <div class="bt-pm-item ai-filter-item">';
+            html += '          <div class="bt-pm-label">AI 过滤</div>';
+            html += `          <div class="bt-pm-value ${aiRetCls}" title="过滤后交易 ${aiFilter.trades}/${aiFilter.original_trades}，过滤率 ${filterRate}%">${aiFilter.return_pct >= 0 ? '+' : ''}${aiFilter.return_pct}%</div>`;
+            html += `          <div class="bt-pm-sub ${aiWinCls}">胜率 ${aiFilter.win_rate}% · ${aiFilter.trades}/${aiFilter.original_trades}</div>`;
+            html += '        </div>';
+        }
         html += '      </div>';
         html += '    </div>';
 
@@ -9159,6 +9702,37 @@ function _renderSignalCard(sig, type, trackDate) {
     // 卖出原因
     const reasonHtml = (isSell && sig.reason && !sig.pattern) ? `<div class="sr-desc"><i class="bi bi-megaphone"></i><span>${sig.reason}</span></div>` : '';
 
+    // ⭐ AI 评分行（克制版：融入数据流，标题蓝紫渐变，进度条中性灰，≥70% 蓝色强调）
+    let aiHtml = '';
+    if (sig.ai_available !== false && (sig.xgb_buy_prob !== null && sig.xgb_buy_prob !== undefined
+                                       || sig.cnn_buy_prob !== null && sig.cnn_buy_prob !== undefined)) {
+        const xgbProb = sig.xgb_buy_prob;
+        const cnnProb = sig.cnn_buy_prob;
+        const xgbPct = (xgbProb !== null && xgbProb !== undefined) ? Math.round(xgbProb * 100) : null;
+        const cnnPct = (cnnProb !== null && cnnProb !== undefined) ? Math.round(cnnProb * 100) : null;
+        const xgbStrong = (xgbPct !== null && xgbPct >= 70);
+        const cnnStrong = (cnnPct !== null && cnnPct >= 70);
+        const xgbLabel = isSell ? 'XGB 看跌' : 'XGB 看涨';
+        const cnnLabel = isSell ? 'CNN 看跌' : 'CNN 看涨';
+        const xgbItem = (xgbPct !== null) ? `<div class="sr-ai-item">
+            <span class="sr-ai-name">${xgbLabel}</span>
+            <div class="sr-ai-bar"><div class="sr-ai-bar-fill${xgbStrong ? ' strong' : ''}" style="width:${xgbPct}%"></div></div>
+            <span class="sr-ai-val${xgbStrong ? ' strong' : ''}">${xgbPct}%</span>
+        </div>` : '';
+        const cnnItem = (cnnPct !== null) ? `<div class="sr-ai-item">
+            <span class="sr-ai-name">${cnnLabel}</span>
+            <div class="sr-ai-bar"><div class="sr-ai-bar-fill${cnnStrong ? ' strong' : ''}" style="width:${cnnPct}%"></div></div>
+            <span class="sr-ai-val${cnnStrong ? ' strong' : ''}">${cnnPct}%</span>
+        </div>` : '';
+        aiHtml = `<div class="sr-ai-box">
+            <div class="sr-ai-label">AI 评分</div>
+            <div class="sr-ai-items">${xgbItem}${cnnItem}</div>
+        </div>`;
+    } else if (sig.ai_available === false) {
+        // 降级时不展示，避免卡片冗余
+        aiHtml = '';
+    }
+
     // 操作按钮（K线 + 历史回测）
     const klineBtn = `<button class="btn btn-outline-secondary btn-sm" style="font-size:11px;padding:4px 10px" onclick="event.stopPropagation();showKlineFromSignal('${sig.code || ''}','${(sig.name||'').replace(/'/g, "\\'")}','${safeTrackDate.replace(/-/g,'')}')"><i class="bi bi-graph-up me-1"></i>K线</button>`;
     const backtestBtn = `<button class="btn btn-outline-primary btn-sm" style="font-size:11px;padding:4px 10px" onclick="event.stopPropagation();viewSignalBacktest({code:'${(sig.code||'').replace(/'/g,"\\'")}',name:'${(sig.name||'').replace(/'/g,"\\'")}',pattern:'${(sig.pattern||'').replace(/'/g,"\\'")}',type:'${type}'})" title="查看该信号在个股上的历史回测表现"><i class="bi bi-bar-chart-fill me-1"></i>回测</button>`;
@@ -9180,6 +9754,7 @@ function _renderSignalCard(sig, type, trackDate) {
             <div class="sr-pattern-info">${patternInfoHtml}</div>
         </div>
         <div class="sr-price-row">${priceHtml}</div>
+        ${aiHtml}
         ${perfHtml}
         ${descHtml}
         ${reasonHtml}

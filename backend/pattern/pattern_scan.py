@@ -467,6 +467,240 @@ def _backtest_pattern_vectorized(df, signal, pattern_name, pattern_type,
     return trade_details, equity_curve, holding_days_total
 
 
+# ============================================================================
+# AI 过滤对照回测
+# ============================================================================
+_AI_SERVER_URL = 'http://127.0.0.1:8766'
+_ai_filter_available = None  # 缓存探测结果
+
+
+def _ai_filter_health_check():
+    """探测 Model Server 是否可达，结果缓存。"""
+    global _ai_filter_available
+    if _ai_filter_available is not None:
+        return _ai_filter_available
+    try:
+        import urllib.request
+        req = urllib.request.Request(f'{_AI_SERVER_URL}/health', method='GET')
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            _ai_filter_available = (resp.status == 200)
+            return _ai_filter_available
+    except Exception:
+        _ai_filter_available = False
+        return False
+
+
+def _ai_filter_batch_predict(klines):
+    """批量调用 Model Server，返回 (xgb_probs, cnn_probs)。"""
+    import urllib.request
+    import json as _json
+    if not _ai_filter_health_check():
+        return None, None
+
+    xgb_probs = None
+    cnn_probs = None
+    payload = _json.dumps({'klines': klines}).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(
+            f'{_AI_SERVER_URL}/predict/xgb/batch',
+            data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode('utf-8'))
+            if data.get('ai_available'):
+                xgb_probs = data.get('probs')
+    except Exception:
+        pass
+
+    try:
+        req = urllib.request.Request(
+            f'{_AI_SERVER_URL}/predict/cnn/batch',
+            data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode('utf-8'))
+            if data.get('ai_available'):
+                cnn_probs = data.get('probs')
+    except Exception:
+        pass
+
+    return xgb_probs, cnn_probs
+
+
+def _run_ai_filter_backtest(df, signal, pattern_name, pattern_type,
+                            observe_day, cash, cautious,
+                            xgb_threshold=0.6, cnn_threshold=0.6):
+    """AI 过滤对照回测：仅保留 AI 置信度达标的信号，重新跑回测。
+
+    逻辑:
+        1. 找出所有信号触发点（signal[i-1] 为 True，i 为执行日）
+        2. 对每个触发点的前 20 根 K 线调用 AI 批量推理
+        3. 过滤：xgb_prob >= threshold AND cnn_prob >= threshold → 保留
+        4. 用过滤后的信号 mask 重新跑回测
+        5. 返回过滤后绩效 + 过滤率
+
+    Args:
+        df: 已过滤日期的 K 线 DataFrame
+        signal: 原始信号 numpy array
+        pattern_name/pattern_type: 形态名/类型
+        observe_day/cash/cautious: 回测参数
+        xgb_threshold/cnn_threshold: AI 过滤阈值
+
+    Returns:
+        dict: {
+            'enabled': True,
+            'xgb_threshold': float,
+            'cnn_threshold': float,
+            'original_trades': int,
+            'trades': int,
+            'win_rate': float,
+            'return_pct': float,
+            'sharpe': float,
+            'hold_max_drawdown': float,
+            'filter_rate': float,  # 被过滤比例
+        }
+        若 AI 服务不可用返回 None（不添加 ai_filter 字段）
+    """
+    if not _ai_filter_health_check():
+        return None
+
+    n = len(df)
+    if n < 22:  # 至少需要 20 根历史 + 1 触发 + 1 执行
+        return None
+
+    # 找出所有信号触发点（signal[i-1] 为 True，i 为执行日）
+    # 与 _backtest_pattern_vectorized 的开仓逻辑一致：i>0 且 signal_mask[i-1] 为 True
+    trigger_indices = []
+    for i in range(1, n):
+        if pattern_type == 'buy':
+            if signal[i - 1] > 0:
+                trigger_indices.append(i)
+        else:
+            if signal[i - 1] < 0:
+                trigger_indices.append(i)
+
+    if not trigger_indices:
+        # 原始信号就无交易，AI 过滤也无意义
+        return None
+
+    # 收集每个触发点的前 20 根 K 线窗口
+    klines = []
+    valid_triggers = []
+    for idx in trigger_indices:
+        if idx < 20:
+            # 数据不足 20 根，跳过此触发点（不过滤，保留原始信号）
+            valid_triggers.append((idx, None, None))
+            continue
+        window = df.iloc[idx - 20: idx]
+        if len(window) < 20:
+            valid_triggers.append((idx, None, None))
+            continue
+        arr = window[['open', 'high', 'low', 'close', 'vol']].values.astype(np.float64)
+        klines.append(arr.tolist())
+        valid_triggers.append((idx, None, None))  # 占位，后面填概率
+
+    if not klines:
+        return None
+
+    # 批量推理
+    xgb_probs, cnn_probs = _ai_filter_batch_predict(klines)
+    if xgb_probs is None and cnn_probs is None:
+        return None
+
+    # 分发概率到对应触发点
+    prob_idx = 0
+    for i, (idx, _, _) in enumerate(valid_triggers):
+        if idx < 20 or len(df.iloc[idx - 20: idx]) < 20:
+            continue  # 数据不足，不过滤
+        xgb_p = xgb_probs[prob_idx] if xgb_probs and prob_idx < len(xgb_probs) else None
+        cnn_p = cnn_probs[prob_idx] if cnn_probs and prob_idx < len(cnn_probs) else None
+        valid_triggers[i] = (idx, xgb_p, cnn_p)
+        prob_idx += 1
+
+    # 构建过滤后的信号 mask
+    # 信号在 i-1 触发，i 执行。过滤即把 signal[i-1] 置 0
+    filtered_signal = signal.copy()
+    kept_count = 0
+    total_count = 0
+    for idx, xgb_p, cnn_p in valid_triggers:
+        if idx < 1:
+            continue
+        total_count += 1
+        # AI 过滤：两个模型概率都需达标（若有概率则判断，无概率则保留）
+        keep = True
+        if xgb_p is not None and xgb_p < xgb_threshold:
+            keep = False
+        if cnn_p is not None and cnn_p < cnn_threshold:
+            keep = False
+        if not keep:
+            filtered_signal[idx - 1] = 0  # 把触发信号置 0
+        else:
+            kept_count += 1
+
+    if kept_count == 0:
+        # 所有信号被过滤
+        return {
+            'enabled': True,
+            'xgb_threshold': xgb_threshold,
+            'cnn_threshold': cnn_threshold,
+            'original_trades': len(trigger_indices),
+            'trades': 0,
+            'win_rate': 0,
+            'return_pct': 0,
+            'sharpe': 0,
+            'hold_max_drawdown': 0,
+            'filter_rate': 1.0 if total_count > 0 else 0,
+        }
+
+    # 用过滤后信号重新跑回测
+    ai_trade_details, ai_equity_curve, _ = _backtest_pattern_vectorized(
+        df, filtered_signal, pattern_name, pattern_type,
+        observe_day, cash, cautious,
+    )
+
+    ai_total_trades = len(ai_trade_details)
+    if ai_total_trades > 0:
+        ai_won = sum(1 for t in ai_trade_details if t.get('pnl_pct', 0) > 0)
+        ai_win_rate = round(ai_won / ai_total_trades * 100)
+    else:
+        ai_win_rate = 0
+    ai_return_pct = round(sum(t.get('pnl_pct', 0) for t in ai_trade_details), 2)
+
+    # 夏普
+    ai_sharpe = 0.0
+    if len(ai_equity_curve) > 1:
+        daily_returns = np.diff(ai_equity_curve) / ai_equity_curve[:-1]
+        valid_mask = daily_returns != 0
+        if valid_mask.sum() > 1:
+            mean_ret = np.mean(daily_returns[valid_mask])
+            std_ret = np.std(daily_returns[valid_mask], ddof=1)
+            if std_ret > 1e-12:
+                ai_sharpe = round((mean_ret / std_ret) * np.sqrt(252), 2)
+
+    # 最大回撤
+    ai_max_dd = 0.0
+    if len(ai_equity_curve) > 0:
+        peak = ai_equity_curve[0]
+        for v in ai_equity_curve:
+            if v > peak:
+                peak = v
+            dd = (peak - v) / peak * 100
+            if dd > ai_max_dd:
+                ai_max_dd = dd
+
+    return {
+        'enabled': True,
+        'xgb_threshold': xgb_threshold,
+        'cnn_threshold': cnn_threshold,
+        'original_trades': len(trigger_indices),
+        'trades': ai_total_trades,
+        'win_rate': ai_win_rate,
+        'return_pct': ai_return_pct,
+        'sharpe': ai_sharpe,
+        'hold_max_drawdown': round(ai_max_dd, 2),
+        'filter_rate': round(1 - kept_count / max(total_count, 1), 4),
+    }
+
+
 def run_single_pattern(code, pattern_name, pattern_type, start_date, end_date,
                        data_folder_dir, observe_day=2, cash=100000000, cautious=False,
                        cached_df=None, cached_signal=None):
@@ -583,6 +817,16 @@ def run_single_pattern(code, pattern_name, pattern_type, start_date, end_date,
         'hold_max_drawdown': round(max_drawdown, 2),
         'trade_details': trade_details,
     }
+
+    # AI 过滤对照回测（可选，失败静默降级）
+    ai_filter_result = _run_ai_filter_backtest(
+        filtered_df, signal, pattern_name, pattern_type,
+        observe_day, cash, cautious,
+        xgb_threshold=getattr(config, 'AI_BUY_THRESHOLD', 0.6),
+        cnn_threshold=getattr(config, 'AI_SELL_THRESHOLD', 0.6),
+    )
+    if ai_filter_result is not None:
+        result['ai_filter'] = ai_filter_result
 
     # 结果库写入：缓存回测结果，下次相同参数直接读库
     if cache_key is not None:
