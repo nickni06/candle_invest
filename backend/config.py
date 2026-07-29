@@ -72,8 +72,8 @@ class Config:
     PREFETCH_TIMEOUT_SECONDS = 60
     # 单 worker 任务超时（秒），防止永久挂起
     WORKER_TIMEOUT_SECONDS = 30
-    # 信号跟踪默认向前回溯的自然日数（TA-Lib 形态最长需 5 根 K 线，15 天约 10 个交易日已足够）
-    TRACKING_LOOKBACK_DAYS = 15
+    # 信号跟踪默认向前回溯的自然日数（AI 评分需 20 根 K 线窗口，35 天约 24 个交易日）
+    TRACKING_LOOKBACK_DAYS = 35
 
     # ============================================================================
     # 盈湖（Yinghu DB）：全市场股票日K的统一存储，按月分区 Parquet
@@ -105,5 +105,31 @@ class Config:
     FLASK_HOST = '127.0.0.1'
     FLASK_PORT = 8765
     FLASK_DEBUG = False
+
+    # ============================================================================
+    # AI 模型（CNN + XGBoost 融合买卖点信号）
+    # ============================================================================
+    # AI 模块根目录（backend/ai/）
+    AI_DIR = BASE_DIR / 'backend' / 'ai'
+    # AI 训练样本目录（按 <code>_samples.npy / <code>_labels.npy 分文件存储）
+    AI_SAMPLE_DIR = AI_DIR / 'data' / 'train'
+    # AI 模型输出目录（.pth / .onnx / .json / .pkl）
+    AI_MODEL_DIR = AI_DIR / 'outputs'
+    # AI 推理服务端口（与 Flask 主服务独立，避免 PyTorch 占用主进程内存）
+    AI_MODEL_SERVER_PORT = 8766
+    # AI 样本默认参数（与 sample_collector.py 保持一致）
+    AI_SAMPLE_SEQ_LEN = 20          # 输入 K 线根数
+    AI_SAMPLE_FORWARD_DAYS = 5       # 未来窗口 N
+    AI_SAMPLE_ATR_PERIOD = 100       # ATR 计算周期
+    AI_SAMPLE_ATR_MULTIPLIER = 1.0   # 正样本涨幅阈值 = ATR × 1.0
+    AI_SAMPLE_MAX_DRAWDOWN = -0.08   # 回撤过滤阈值（软过滤，不作硬标签）
+    # AI 信号阈值（超过才触发买卖）
+    AI_BUY_THRESHOLD = 0.6
+    AI_SELL_THRESHOLD = 0.6
+    # AI 采样默认标的数（从 stock_data.csv 随机抽取，0=全部 A 股）
+    AI_SAMPLE_DEFAULT_CODES = 50
+    # AI 样本默认时间范围
+    AI_SAMPLE_START_DATE = '20100101'
+    AI_SAMPLE_END_DATE = '20260727'
 
 config = Config()

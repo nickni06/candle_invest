@@ -16,7 +16,10 @@
 6. observe_day 语义：买入后持有 N 个交易日，第 N+1 日卖出
 """
 import os
+import json
 import logging
+import urllib.request
+import urllib.error
 import pandas as pd
 import numpy as np
 import talib
@@ -31,6 +34,186 @@ except Exception:
     PATTERN_DESCRIPTIONS = {}
 
 logger = logging.getLogger('trader_system')
+
+# ============================================================================
+# AI 评分（Model Server 批量调用，离线静默降级）
+# ============================================================================
+_AI_SERVER_URL = 'http://127.0.0.1:8766'
+_AI_TIMEOUT = 5  # 单次请求超时 5 秒，超时则降级
+# 缓存：仅在成功时缓存（True），失败不缓存以便下次重试
+_ai_server_available = None
+_ai_health_check_ts = 0  # 上次探测时间戳（秒），失败时 60s 内不重复探测
+
+
+def _ai_health_check():
+    """探测 Model Server 是否可达。
+
+    缓存策略：
+    - 成功 → 永久缓存 True（直到进程结束）
+    - 失败 → 60s 内不重复探测，60s 后允许重试（避免每次信号都打 HTTP）
+    """
+    import time
+    global _ai_server_available, _ai_health_check_ts
+    if _ai_server_available is True:
+        return True
+    now = time.time()
+    if _ai_server_available is False and (now - _ai_health_check_ts) < 60:
+        return False
+    try:
+        req = urllib.request.Request(f'{_AI_SERVER_URL}/health', method='GET')
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                _ai_server_available = True
+                _ai_health_check_ts = now
+                logger.info(f'[AI] Model Server 健康检查通过 ({_AI_SERVER_URL})')
+                return True
+    except Exception as e:
+        logger.warning(f'[AI] Model Server 不可达: {type(e).__name__}: {e}')
+    _ai_server_available = False
+    _ai_health_check_ts = now
+    return False
+
+
+def _ai_batch_predict(klines):
+    """批量调用 AI Model Server，返回 (xgb_probs, cnn_probs)。
+
+    Args:
+        klines: list of (20, 5) OHLCV 数组
+
+    Returns:
+        (xgb_probs, cnn_probs): 各为 list[float] 或 None（服务不可用时）
+    """
+    if not klines:
+        return None, None
+    if not _ai_health_check():
+        logger.warning(f'[AI] 跳过批量推理：Model Server 不可达，klines={len(klines)} 个')
+        return None, None
+
+    xgb_probs = None
+    cnn_probs = None
+
+    # XGBoost 批量
+    try:
+        payload = json.dumps({'klines': klines}).encode('utf-8')
+        req = urllib.request.Request(
+            f'{_AI_SERVER_URL}/predict/xgb/batch',
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+        with urllib.request.urlopen(req, timeout=_AI_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('ai_available'):
+                xgb_probs = data.get('probs')
+                logger.info(f'[AI] XGBoost 推理成功: {len(xgb_probs) if xgb_probs else 0} 个样本')
+            else:
+                logger.warning(f'[AI] XGBoost 推理返回 ai_available=false: {data}')
+    except Exception as e:
+        logger.warning(f'[AI] XGBoost 批量推理异常: {type(e).__name__}: {e}')
+
+    # CNN 批量
+    try:
+        payload = json.dumps({'klines': klines}).encode('utf-8')
+        req = urllib.request.Request(
+            f'{_AI_SERVER_URL}/predict/cnn/batch',
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+        with urllib.request.urlopen(req, timeout=_AI_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('ai_available'):
+                cnn_probs = data.get('probs')
+                logger.info(f'[AI] CNN 推理成功: {len(cnn_probs) if cnn_probs else 0} 个样本')
+            else:
+                logger.warning(f'[AI] CNN 推理返回 ai_available=false: {data}')
+    except Exception as e:
+        logger.warning(f'[AI] CNN 批量推理异常: {type(e).__name__}: {e}')
+
+    return xgb_probs, cnn_probs
+
+
+def _collect_kline_windows(df, target_idx, window_size=20):
+    """收集信号触发点的前序 20 根 K 线窗口（不含触发日）。
+
+    Args:
+        df: K 线 DataFrame，含 open/high/low/close/vol 列
+        target_idx: 信号触发日的行索引
+        window_size: 窗口大小（默认 20）
+
+    Returns:
+        list of (20, 5) numpy 数组，每个对应一个信号触发点
+        若数据不足，返回空列表
+    """
+    if target_idx < window_size:
+        return []
+    # 只取一个窗口（信号跟踪日 target_idx 当天触发，取前 20 根）
+    window = df.iloc[target_idx - window_size: target_idx]
+    if len(window) < window_size:
+        return []
+    arr = window[['open', 'high', 'low', 'close', 'vol']].values.astype(np.float64)
+    return [arr.tolist()]
+
+
+def _enrich_signals_with_ai(signals, df, target_idx):
+    """给信号列表批量补充 AI 评分字段。
+
+    所有信号共享同一个 K 线窗口（同一天触发），所以只需调用一次批量推理。
+    离线时静默降级，xgb_buy_prob/cnn_buy_prob 设为 None。
+
+    Args:
+        signals: 信号 dict 列表
+        df: K 线 DataFrame
+        target_idx: 信号触发日的 pandas 索引值（可能是日期/Timestamp）
+    """
+    if not signals:
+        return
+
+    logger.info(f'[AI] 开始为 {len(signals)} 个信号补充 AI 评分')
+
+    # 把 target_idx（pandas 索引值）转成整数位置
+    try:
+        target_pos = df.index.get_loc(target_idx)
+        if not isinstance(target_pos, int):
+            # 若返回布尔数组，取第一个 True
+            target_pos = int(np.where(target_pos)[0][0])
+        else:
+            target_pos = int(target_pos)
+    except Exception as e:
+        logger.warning(f'[AI] target_idx 转换失败: {e}, 用最后一天兜底')
+        # 兜底：用最后一天
+        target_pos = len(df) - 1
+
+    # 收集 K 线窗口（所有信号共享同一天的前 20 根）
+    klines = _collect_kline_windows(df, target_pos)
+    if not klines:
+        # 数据不足，所有信号标记 AI 不可用
+        logger.warning(f'[AI] K线窗口数据不足 target_pos={target_pos}, 标记不可用')
+        for sig in signals:
+            sig['xgb_buy_prob'] = None
+            sig['cnn_buy_prob'] = None
+            sig['ai_available'] = False
+        return
+
+    # 批量推理（共享同一窗口）
+    xgb_probs, cnn_probs = _ai_batch_predict(klines)
+    xgb_prob = xgb_probs[0] if xgb_probs else None
+    cnn_prob = cnn_probs[0] if cnn_probs else None
+    ai_available = (xgb_prob is not None or cnn_prob is not None)
+    logger.info(f'[AI] 评分完成: xgb={xgb_prob}, cnn={cnn_prob}, available={ai_available}')
+
+    for sig in signals:
+        # 买入信号：xgb_buy_prob = 看涨概率
+        # 卖出信号：xgb_buy_prob 实为看跌概率（模型输出即"正样本概率"）
+        # 这里统一用 buy_prob 字段名，前端按信号 type 解释
+        if sig.get('type') == 'buy':
+            sig['xgb_buy_prob'] = xgb_prob
+            sig['cnn_buy_prob'] = cnn_prob
+        else:
+            # 卖出信号：展示看跌概率 = 1 - 看涨概率
+            sig['xgb_buy_prob'] = (1 - xgb_prob) if xgb_prob is not None else None
+            sig['cnn_buy_prob'] = (1 - cnn_prob) if cnn_prob is not None else None
+        sig['ai_available'] = ai_available
 
 # ============================================================================
 # 全市场形态统计（历史基准）
@@ -369,8 +552,31 @@ def compute_signals_for_code(df, code, code_name, track_date,
         if not mask.any():
             # 跟踪日不在数据中：数据过期或缺失，不能 fallback 到最后一根 K 线
             # （否则会导致不管选哪天都是相同信号）
-            data_range = f'{df["trade_date_str"].iloc[0]}~{df["trade_date_str"].iloc[-1]}'
-            result['error'] = f'跟踪日 {track_date_str} 不在数据中（数据范围：{data_range}），请重新拉取数据'
+            latest_date = df["trade_date_str"].iloc[-1]
+            data_range = f'{df["trade_date_str"].iloc[0]}~{latest_date}'
+
+            # 海外指数当日数据可能尚未生成（时差原因，今天的K线要等晚上才能拿到）
+            overseas_codes = {'DJI', 'FCHI', 'SPX', 'GDAXI', 'N225'}
+            if code in overseas_codes:
+                # 计算最新数据日期与跟踪日的差距
+                try:
+                    from datetime import datetime as _dt
+                    latest_dt = _dt.strptime(latest_date, '%Y%m%d')
+                    track_dt = _dt.strptime(track_date_str, '%Y%m%d')
+                    gap_days = (track_dt - latest_dt).days
+                except Exception:
+                    gap_days = 0
+                if 0 < gap_days <= 3:
+                    result['error'] = (
+                        f'跟踪日 {track_date_str} 数据尚未生成（最新数据：{latest_date}）。'
+                        f'海外指数当日K线通常在收盘后2-3小时更新（北京时间晚间），请稍后重试'
+                    )
+                    return result
+            # 默认提示
+            result['error'] = (
+                f'跟踪日 {track_date_str} 不在数据中（数据范围：{data_range}），'
+                f'系统已尝试拉取最新数据但仍未覆盖，请稍后重试或检查数据源'
+            )
             return result
         target_idx = mask.idxmax()
 
@@ -483,6 +689,9 @@ def compute_signals_for_code(df, code, code_name, track_date,
             sig['close'] = track_close
             sig['pct_chg'] = track_pct_chg
             _enrich_signal(sig)
+
+        # 批量补充 AI 评分（CNN + XGBoost，离线静默降级）
+        _enrich_signals_with_ai(signals, df, target_idx)
 
         result['signals'] = signals
     except Exception as e:

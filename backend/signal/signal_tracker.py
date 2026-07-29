@@ -19,13 +19,11 @@ import multiprocessing
 import platform
 
 # 多进程启动模式：
-# - Linux 默认 fork，速度快且对纯计算任务稳定
-# - macOS 使用 forkserver，避免 Objective-C / V8 / OpenBLAS 等库因 fork 不安全而崩溃，
-#   同时比 spawn 大幅节省子进程初始化时间
+# - macOS/Linux 统一使用 fork，确保 worker 进程继承主进程的 logger 配置和已 import 的模块
+#   （forkserver 模式下 worker 从独立的 forkserver 进程 fork，不继承主进程 logger，
+#    导致 strategy_signals._enrich_signals_with_ai 的 [AI] 日志全部丢失，难以排查问题）
 # - Windows 仅支持 spawn
-if platform.system() == 'Darwin':
-    multiprocessing.set_start_method('forkserver', force=True)
-elif platform.system() == 'Linux':
+if platform.system() in ('Darwin', 'Linux'):
     multiprocessing.set_start_method('fork', force=True)
 # Windows 保持默认 spawn
 
@@ -109,6 +107,10 @@ def _track_one_code(task_args):
     (code, code_name, start_date, end_date, track_date,
      cautious, is_index, data_folder_dir, perf_dir, allow_network,
      track_patterns, held_codes) = task_args
+
+    # 双保险：确保 worker 进程有 file logger（fork 模式继承父进程配置，
+    # spawn/forkserver 模式则需重新配置，否则 [AI] 等日志丢失）
+    _ensure_worker_logger()
 
     try:
         # 第一次 allow_network=False（子进程禁网），重试时 allow_network=True
@@ -579,8 +581,9 @@ def run_tracking(track_date, mode, cautious,
         print(f'[tracker] 无持仓数据，卖出信号将不生成（不计算任何卖出）', flush=True)
 
     # 自动计算数据起始日：track_date 往前推 lookback_days 个自然日
+    # AI 评分需要 20 根 K 线窗口（约 30 个自然日），lookback_days 不能少于 35
     if lookback_days is None:
-        lookback_days = getattr(config, 'TRACKING_LOOKBACK_DAYS', 15)
+        lookback_days = getattr(config, 'TRACKING_LOOKBACK_DAYS', 35)
     from datetime import datetime, timedelta
     track_dt = datetime.strptime(track_date, '%Y-%m-%d')
     start_dt = track_dt - timedelta(days=lookback_days)
@@ -800,9 +803,80 @@ def _write_summary(summary, track_date):
 # ============================================================================
 # CLI 入口（用于 web_app 子进程调用）
 # ============================================================================
+def _setup_subprocess_logger():
+    """子进程独立配置 file logger，让 [AI] 等日志能写入 system_YYYYMMDD.log。
+
+    web_app 主进程的 QueueListener 不在 signal_tracker subprocess 里继承，
+    导致 worker 进程的 logger.info/warning 全部输出到 stderr 后被丢弃。
+    此函数在 main() 入口配置一个独立的 DailyFileHandler，确保子进程日志
+    能与主进程日志合并写入同一文件。
+    """
+    import logging
+    import logging.handlers
+    import os
+    from datetime import datetime
+
+    log_dir = str(config.LOG_DIR)
+    os.makedirs(log_dir, exist_ok=True)
+    today = datetime.now().strftime('%Y%m%d')
+    log_file = os.path.join(log_dir, f'system_{today}.log')
+
+    trader_logger = logging.getLogger('trader_system')
+    trader_logger.setLevel(logging.DEBUG)
+    # 避免重复添加 handler（重启场景）
+    has_file_handler = any(
+        isinstance(h, logging.FileHandler)
+        and getattr(h, 'baseFilename', '') == os.path.abspath(log_file)
+        for h in trader_logger.handlers
+    )
+    if not has_file_handler:
+        fh = logging.FileHandler(log_file, encoding='utf-8')
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+        trader_logger.addHandler(fh)
+    print(f'[tracker] 子进程日志已配置: {log_file}', flush=True)
+
+
+def _ensure_worker_logger():
+    """确保 worker 进程有 file logger。
+
+    fork 模式下 worker 继承父进程（signal_tracker 主进程）的 logger 配置，
+    通常不需要重新配置；但 forkserver/spawn 模式下 worker 不继承，
+    需要显式配置。此函数检查并补全，保证 [AI] 日志能写入 system_YYYYMMDD.log。
+    """
+    import logging
+    import os
+    from datetime import datetime
+
+    trader_logger = logging.getLogger('trader_system')
+    # 检查是否已有 FileHandler
+    for h in trader_logger.handlers:
+        if isinstance(h, logging.FileHandler):
+            return  # 已有 file handler，无需重复配置
+
+    # 没有 file handler（forkserver/spawn 场景），配置一个
+    log_dir = str(config.LOG_DIR)
+    os.makedirs(log_dir, exist_ok=True)
+    today = datetime.now().strftime('%Y%m%d')
+    log_file = os.path.join(log_dir, f'system_{today}.log')
+
+    trader_logger.setLevel(logging.DEBUG)
+    fh = logging.FileHandler(log_file, encoding='utf-8')
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    ))
+    trader_logger.addHandler(fh)
+
+
 def main():
     """CLI 入口，从环境变量读取参数（避免命令行参数解析问题）。"""
     import os
+    _setup_subprocess_logger()
     track_date = os.environ.get('TRACK_DATE', '2025-06-24')
     mode = os.environ.get('TRACK_MODE', 'index')
     cautious = os.environ.get('CAUTIOUS', '0') == '1'
